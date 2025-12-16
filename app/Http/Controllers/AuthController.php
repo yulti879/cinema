@@ -3,49 +3,63 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 
 class AuthController extends Controller
 {
     /**
-     * Логин и выдача токена
+     * Логин через сессии
      */
     public function login(Request $request)
     {
-        $credentials = $request->validate([
+        // Валидация
+        $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
-
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+        // Попытка аутентификации
+        if (Auth::attempt($request->only('email', 'password'))) {
+            // Регенерируем сессию для защиты от фиксации
+            $request->session()->regenerate();
+            
+            $user = Auth::user();
+            
             return response()->json([
-                'message' => 'Неверный email или пароль',
-            ], 422);
+                'success' => true,
+                'message' => 'Авторизация успешна',
+                'role' => $user->role,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ]
+            ]);
         }
 
-        // Создаём персональный токен Sanctum
-        $token = $user->createToken('api')->plainTextToken;
-
+        // Если аутентификация не удалась
         return response()->json([
-            'user' => $user,
-            'token' => $token,
-        ]);
+            'success' => false,
+            'message' => 'Неверный email или пароль'
+        ], 401);
     }
 
     /**
-     * Логаут (удаление токена)
+     * Логаут (уничтожение сессии)
      */
     public function logout(Request $request)
     {
-        $user = $request->user();
-        if ($user) {            
-            $user->tokens()->delete();
-        }
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Выход выполнен'
+        ]);
     }
 
     /**
@@ -53,6 +67,24 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Не авторизован'
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'role' => $user->role,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ]
+        ]);
     }
 }

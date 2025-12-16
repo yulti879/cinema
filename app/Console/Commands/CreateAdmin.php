@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class CreateAdmin extends Command
 {
@@ -26,11 +27,20 @@ class CreateAdmin extends Command
         $user = User::create([
             'name' => 'Admin',
             'email' => $email,
-            'password' => $password,
-            'role' => User::ROLE_ADMIN,
+            'password' => Hash::make($password), // ← ДОБАВЬТЕ Hash::make
+            'role' => 'admin', // или User::ROLE_ADMIN если есть константа
         ]);
 
-        $this->info("Администратор создан: {$user->email}");
+        $this->info("✅ Администратор создан!");
+        $this->table(
+            ['Поле', 'Значение'],
+            [
+                ['Email', $user->email],
+                ['Пароль', $password],
+                ['Роль', $user->role],
+            ]
+        );
+        
         return self::SUCCESS;
     }
 }

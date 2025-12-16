@@ -11,8 +11,42 @@ import axios from 'axios';
 import './AdminPage.css';
 import { CinemaHall, Movie, Screening, HallConfigData } from '../../types';
 
-axios.defaults.baseURL = 'http://localhost:8000';
+axios.defaults.baseURL = 'http://127.0.0.1:8000';
 axios.defaults.withCredentials = true;
+
+// Хелпер для безопасного преобразования данных в массив
+const safeArray = (data: any, endpointName: string = ''): any[] => {
+  console.log(`safeArray for ${endpointName}:`, {
+    data,
+    type: typeof data,
+    isArray: Array.isArray(data)
+  });
+  
+  if (Array.isArray(data)) return data;
+  
+  if (typeof data === 'string') {
+    console.warn(`Endpoint ${endpointName} returned string instead of array:`, data);
+    return [];
+  }
+  
+  if (typeof data === 'object' && data !== null) {
+    // Попробуем найти массив в общих свойствах
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.movies)) return data.movies;
+    if (Array.isArray(data.halls)) return data.halls;
+    if (Array.isArray(data.screenings)) return data.screenings;
+    if (Array.isArray(data.results)) return data.results;
+    
+    // Если это объект с полем "success" и "data"
+    if (data.success && Array.isArray(data.data)) {
+      return data.data;
+    }
+  }
+  
+  console.warn(`Endpoint ${endpointName} returned unexpected data:`, typeof data, data);
+  return [];
+};
 
 export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,9 +74,16 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Checking auth...');
         const res = await axios.get('/api/me');
-        if (res.data.role === 'admin') setIsAuthenticated(true);
-      } catch {
+        console.log('Auth response:', res.data);
+        if (res.data.role === 'admin') {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
@@ -55,10 +96,15 @@ export const AdminPage: React.FC = () => {
   // Login / Logout
   // -----------------------
   const handleLogin = async (email: string, password: string) => {
+    console.log('Logging in...');
     await axios.get('/sanctum/csrf-cookie');
     const res = await axios.post('/api/login', { email, password });
-    if (res.data.role === 'admin') setIsAuthenticated(true);
-    else throw new Error('Неверный email или пароль');
+    console.log('Login response:', res.data);
+    if (res.data.role === 'admin') {
+      setIsAuthenticated(true);
+    } else {
+      throw new Error('Неверный email или пароль');
+    }
   };
 
   const handleLogout = async () => {
@@ -75,11 +121,16 @@ export const AdminPage: React.FC = () => {
   const loadHalls = async () => {
     setLoadingHalls(true);
     try {
+      console.log('Loading halls...');
       const res = await axios.get('/api/halls');
-      setHalls(res.data);
+      console.log('Halls API response:', res.data);
+      const normalizedHalls = safeArray(res.data, 'halls');
+      console.log('Normalized halls:', normalizedHalls);
+      setHalls(normalizedHalls);
     } catch (err) {
       console.error('Ошибка загрузки залов', err);
       alert('Не удалось загрузить список залов');
+      setHalls([]);
     } finally {
       setLoadingHalls(false);
     }
@@ -88,11 +139,23 @@ export const AdminPage: React.FC = () => {
   const loadMovies = async () => {
     setLoadingMovies(true);
     try {
+      console.log('Loading movies...');
       const res = await axios.get('/api/movies');
-      setMovies(res.data);
+      console.log('Movies API response:', {
+        data: res.data,
+        type: typeof res.data,
+        isArray: Array.isArray(res.data),
+        status: res.status,
+        headers: res.headers
+      });
+      
+      const normalizedMovies = safeArray(res.data, 'movies');
+      console.log('Normalized movies:', normalizedMovies);
+      setMovies(normalizedMovies);
     } catch (err) {
       console.error('Ошибка загрузки фильмов', err);
       alert('Не удалось загрузить список фильмов');
+      setMovies([]);
     } finally {
       setLoadingMovies(false);
     }
@@ -101,21 +164,87 @@ export const AdminPage: React.FC = () => {
   const loadScreenings = async () => {
     setLoadingScreenings(true);
     try {
+      console.log('Loading screenings...');
       const res = await axios.get('/api/screenings');
-      setScreenings(res.data);
+      console.log('Screenings API response:', res.data);
+      const normalizedScreenings = safeArray(res.data, 'screenings');
+      console.log('Normalized screenings:', normalizedScreenings);
+      setScreenings(normalizedScreenings);
     } catch (err) {
       console.error('Ошибка загрузки сеансов', err);
       alert('Не удалось загрузить список сеансов');
+      setScreenings([]);
     } finally {
       setLoadingScreenings(false);
     }
   };
 
+  // Логирование изменений состояний
+  useEffect(() => {
+    console.log('Movies state updated:', {
+      movies,
+      length: movies.length,
+      type: typeof movies,
+      isArray: Array.isArray(movies),
+      firstItem: movies[0]
+    });
+  }, [movies]);
+
+  useEffect(() => {
+    console.log('Halls state updated:', {
+      halls,
+      length: halls.length,
+      type: typeof halls,
+      isArray: Array.isArray(halls),
+      firstItem: halls[0]
+    });
+  }, [halls]);
+
+  useEffect(() => {
+    console.log('Screenings state updated:', {
+      screenings,
+      length: screenings.length,
+      type: typeof screenings,
+      isArray: Array.isArray(screenings),
+      firstItem: screenings[0]
+    });
+  }, [screenings]);
+
+  // Загрузка данных при авторизации
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('User authenticated, loading data...');
       loadHalls();
       loadMovies();
       loadScreenings();
+      
+      // Временный мок для тестирования, если API не работает
+      setTimeout(() => {
+        if (movies.length === 0) {
+          console.log('No movies loaded, adding mock data for testing');
+          const mockMovies = [
+            {
+              id: '1',
+              title: 'Тестовый фильм',
+              poster: '/images/posters/default.jpg',
+              synopsis: 'Описание тестового фильма',
+              duration: 120,
+              origin: 'Россия'
+            },
+            {
+              id: '2', 
+              title: 'Другой фильм',
+              poster: '/images/posters/default.jpg',
+              synopsis: 'Еще одно описание',
+              duration: 90,
+              origin: 'США'
+            }
+          ];
+          setMovies(mockMovies);
+        }
+      }, 1000);
+    } else {
+      console.log('User not authenticated');
     }
   }, [isAuthenticated]);
 

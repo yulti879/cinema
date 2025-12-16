@@ -6,7 +6,7 @@
     <title>CinemaBooking</title>
 
     @viteReactRefresh
-    @vite(['resources/js/App.tsx'])
+    @vite(['resources/js/app.tsx'])
 </head>
 <body>
 

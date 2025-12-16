@@ -31,6 +31,30 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   onScreeningAdded,
   onScreeningDeleted
 }) => {
+  // Добавляем логирование для отладки
+  console.log('ScheduleManagement received data:', {
+    hallsType: typeof halls,
+    hallsIsArray: Array.isArray(halls),
+    hallsValue: halls,
+    moviesType: typeof movies,
+    moviesIsArray: Array.isArray(movies),
+    moviesValue: movies,
+    screeningsType: typeof screenings,
+    screeningsIsArray: Array.isArray(screenings),
+    screeningsValue: screenings,
+  });
+
+  // Защитные массивы на случай, если данные не массивы
+  const safeHalls = Array.isArray(halls) ? halls : [];
+  const safeMovies = Array.isArray(movies) ? movies : [];
+  const safeScreenings = Array.isArray(screenings) ? screenings : [];
+
+  console.log('Safe arrays lengths:', {
+    halls: safeHalls.length,
+    movies: safeMovies.length,
+    screenings: safeScreenings.length,
+  });
+
   const [isAddMoviePopupOpen, setIsAddMoviePopupOpen] = useState(false);
   const [isAddScreeningPopupOpen, setIsAddScreeningPopupOpen] = useState(false);
   const [isDeleteMoviePopupOpen, setIsDeleteMoviePopupOpen] = useState(false);
@@ -68,7 +92,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
     const newStart = getTimeInMinutes(startTime);
     const newEnd = newStart + duration;
 
-    return screenings
+    return safeScreenings
       .filter(s => s.hallId === hallId && s.date === date)
       .some(s => {
         const existingStart = getTimeInMinutes(s.startTime);
@@ -92,7 +116,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
     }
 
     const data = await response.json();
-    return data.url; // предполагаем, что API возвращает { url: string }
+    return data.url;
   };
 
   const handleUploadPosterClick = () => {
@@ -144,11 +168,10 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       try {
         setIsUploading(true);
         
-        // Используем загруженный постер или дефолтный
         const posterUrl = newMovie.posterUrl || '/images/posters/default.jpg';
         
         const movie: Movie = {
-          id: '0', // временный ID, будет заменен сервером
+          id: '0',
           title: newMovie.title,
           poster: posterUrl,
           synopsis: newMovie.synopsis,
@@ -156,10 +179,8 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
           origin: newMovie.origin
         };
         
-        // Вызываем колбэк для создания фильма через API
         await onMovieAdded(movie);
         
-        // Закрываем попап и сбрасываем форму только после успешного создания
         setIsAddMoviePopupOpen(false);
         setNewMovie({ 
           title: '', 
@@ -171,7 +192,8 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
         setHasUnsavedChanges(true);
         
       } catch (error) {
-        console.error('Ошибка при добавлении фильма:', error);        
+        console.error('Ошибка при добавлении фильма:', error);
+        alert('Ошибка при добавлении фильма');
       } finally {
         setIsUploading(false);
       }
@@ -204,8 +226,8 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   const handleAddScreening = (e: React.FormEvent) => {
     e.preventDefault();
     if (newScreening.hallId && newScreening.movieId && newScreening.startTime) {
-      const movie = movies.find(m => m.id === newScreening.movieId);
-      const hall = halls.find(h => h.id === newScreening.hallId);
+      const movie = safeMovies.find(m => m.id === newScreening.movieId);
+      const hall = safeHalls.find(h => h.id === newScreening.hallId);
       
       if (!movie || !hall) {
         alert('Ошибка: фильм или зал не найден');
@@ -306,11 +328,11 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   };
 
   const getMovieTitle = (movieId: string): string => {
-    return movies.find(m => m.id === movieId)?.title || 'Неизвестный фильм';
+    return safeMovies.find(m => m.id === movieId)?.title || 'Неизвестный фильм';
   };
 
   const getHallName = (hallId: string): string => {
-    return halls.find(h => h.id === hallId)?.name || 'Неизвестный зал';
+    return safeHalls.find(h => h.id === hallId)?.name || 'Неизвестный зал';
   };
 
   return (
@@ -471,7 +493,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
             onChange={(e) => setNewScreening(prev => ({ ...prev, hallId: e.target.value }))}
             options={[
               { value: '', label: 'Выберите зал' },
-              ...halls.map(hall => ({ value: hall.id, label: hall.name }))
+              ...safeHalls.map(hall => ({ value: hall.id, label: hall.name }))
             ]}
             required
           />
@@ -483,7 +505,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
             onChange={(e) => setNewScreening(prev => ({ ...prev, movieId: e.target.value }))}
             options={[
               { value: '', label: 'Выберите фильм' },
-              ...movies.map(movie => ({ value: movie.id, label: movie.title }))
+              ...safeMovies.map(movie => ({ value: movie.id, label: movie.title }))
             ]}
             required
           />
@@ -539,27 +561,27 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
 
       {/* Список фильмов */}
       <div className="conf-step__movies">
-        {movies.map(movie => (
-          <div key={movie.id} className="conf-step__movie">
-            <Poster
-              src={movie.poster}
-              alt={`Постер фильма ${movie.title}`}
-            />
-            <div className="conf-step__movie-info">
-              <h3 className="conf-step__movie-title">{movie.title}</h3>
-              <p className="conf-step__movie-duration">{movie.duration} минут</p>
-              <p className="conf-step__movie-origin">{movie.origin}</p>
+        {safeMovies.length > 0 ? (
+          safeMovies.map(movie => (
+            <div key={movie.id} className="conf-step__movie">
+              <Poster
+                src={movie.poster}
+                alt={`Постер фильма ${movie.title}`}
+              />
+              <div className="conf-step__movie-info">
+                <h3 className="conf-step__movie-title">{movie.title}</h3>
+                <p className="conf-step__movie-duration">{movie.duration} минут</p>
+                <p className="conf-step__movie-origin">{movie.origin}</p>
+              </div>
+              <ConfigButton
+                variant="trash"
+                onClick={() => handleDeleteMovie(movie)}
+                title="Удалить фильм"
+                className="conf-step__movie-delete"
+              />
             </div>
-            <ConfigButton
-              variant="trash"
-              onClick={() => handleDeleteMovie(movie)}
-              title="Удалить фильм"
-              className="conf-step__movie-delete"
-            />
-          </div>
-        ))}
-        
-        {movies.length === 0 && (
+          ))
+        ) : (
           <p className="conf-step__paragraph" style={{ color: '#848484', fontStyle: 'italic' }}>
             Пока нет добавленных фильмов. Нажмите "Добавить фильм" чтобы добавить первый фильм.
           </p>
@@ -577,51 +599,59 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
 
       {/* Расписание сеансов */}
       <div className="conf-step__seances">
-        {halls.map(hall => (
-          <div key={hall.id} className="conf-step__seances-hall">
-            <h3 className="conf-step__seances-title">{hall.name}</h3>
-            <div className="conf-step__seances-timeline">
-              {screenings
-                .filter(screening => screening.hallId === hall.id)
-                .map(screening => {
-                  const movie = movies.find(m => m.id === screening.movieId);
-                  return (
-                    <div
-                      key={screening.id}
-                      className="conf-step__seances-movie"
-                      style={{
-                        width: `${screening.duration}px`,
-                        backgroundColor: `hsl(${Math.random() * 360}, 70%, 80%)`,
-                        left: `${getTimePosition(screening.startTime)}px`
-                      }}
-                    >
-                      <p className="conf-step__seances-movie-title">
-                        {movie?.title || 'Неизвестный фильм'}
-                      </p>
-                      <p className="conf-step__seances-movie-start">{screening.startTime}</p>
-                      
-                      <ConfigButton 
-                        variant="trash"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          handleDeleteScreening(screening, e);
+        {safeHalls.length > 0 ? (
+          safeHalls.map(hall => (
+            <div key={hall.id} className="conf-step__seances-hall">
+              <h3 className="conf-step__seances-title">{hall.name}</h3>
+              <div className="conf-step__seances-timeline">
+                {safeScreenings
+                  .filter(screening => screening.hallId === hall.id)
+                  .map(screening => {
+                    const movie = safeMovies.find(m => m.id === screening.movieId);
+                    return (
+                      <div
+                        key={screening.id}
+                        className="conf-step__seances-movie"
+                        style={{
+                          width: `${screening.duration}px`,
+                          backgroundColor: `hsl(${Math.random() * 360}, 70%, 80%)`,
+                          left: `${getTimePosition(screening.startTime)}px`
                         }}
-                        title="Удалить сеанс"
-                        className="trash-seance-button"
-                      />
-                    </div>
-                  );
-                })
-              }
-              
-              {screenings.filter(s => s.hallId === hall.id).length === 0 && (
-                <div className="conf-step__seances-empty">
-                  Нет сеансов в этом зале
-                </div>
-              )}
+                      >
+                        <p className="conf-step__seances-movie-title">
+                          {movie?.title || 'Неизвестный фильм'}
+                        </p>
+                        <p className="conf-step__seances-movie-start">{screening.startTime}</p>
+                        
+                        <ConfigButton 
+                          variant="trash"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleDeleteScreening(screening, e);
+                          }}
+                          title="Удалить сеанс"
+                          className="trash-seance-button"
+                        />
+                      </div>
+                    );
+                  })
+                }
+                
+                {safeScreenings.filter(s => s.hallId === hall.id).length === 0 && (
+                  <div className="conf-step__seances-empty">
+                    Нет сеансов в этом зале
+                  </div>
+                )}
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="conf-step__seances-empty">
+            <p className="conf-step__paragraph" style={{ color: '#848484', fontStyle: 'italic' }}>
+              Нет доступных залов. Сначала добавьте залы в разделе "Конфигурация залов".
+            </p>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Кнопки сохранения и отмены */}
