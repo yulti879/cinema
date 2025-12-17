@@ -1,103 +1,79 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import './Popup.css';
 
 interface PopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
+  title?: string;
   children: React.ReactNode;
+  isOpen?: boolean;
+  onClose: () => void;
 }
 
-export const Popup: React.FC<PopupProps> = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-}) => {
-  const [visible, setVisible] = useState(isOpen);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const previousOverflow = useRef<string | null>(null);
+export const Popup: React.FC<PopupProps> = ({ isOpen = false, onClose, title, children }) => {
+  const [isActive, setIsActive] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
-  //
-  // Управление scroll lock
-  //
+  // Монтирование / размонтирование с анимацией
   useEffect(() => {
     if (isOpen) {
-      previousOverflow.current = document.body.style.overflow;
+      setIsVisible(true);
+      // Небольшая задержка для активации CSS-анимации
+      const timer = setTimeout(() => setIsActive(true), 10);
+      // Блокировка скролла
       document.body.style.overflow = 'hidden';
-      setVisible(true);
+      return () => clearTimeout(timer);
     } else {
-      document.body.style.overflow = previousOverflow.current || '';
+      setIsActive(false);
+      const timer = setTimeout(() => setIsVisible(false), 500); // совпадает с длительностью CSS-анимации
+      document.body.style.overflow = '';
+      return () => clearTimeout(timer);
     }
-
-    return () => {
-      document.body.style.overflow = previousOverflow.current || '';
-    };
   }, [isOpen]);
 
-  //
-  // Обработка ESC
-  //
+  // Закрытие по ESC
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
+    const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
-  //
-  // Определение окончания CSS-анимации закрытия
-  //
-  useEffect(() => {
-    const node = popupRef.current;
-    if (!node) return;
-
-    const handleAnimationEnd = () => {
-      if (!isOpen) setVisible(false);
-    };
-
-    node.addEventListener('animationend', handleAnimationEnd);
-    node.addEventListener('transitionend', handleAnimationEnd);
-
-    return () => {
-      node.removeEventListener('animationend', handleAnimationEnd);
-      node.removeEventListener('transitionend', handleAnimationEnd);
-    };
-  }, [isOpen]);
-
-  if (!visible) return null;
-
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
+  const handleClose = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.preventDefault();
+    onClose();
   };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      handleClose(e);
+    }
+  };
+
+  if (!isVisible) return null;
 
   return (
     <div
-      className={`popup ${isOpen ? 'active' : ''}`}
+      className={`popup ${isActive ? 'active' : ''}`}
       onClick={handleOverlayClick}
-      ref={popupRef}
     >
       <div className="popup__container">
         <div className="popup__content">
-
-          {/* Header */}
           <div className="popup__header">
-            <h2 className="popup__title">{title}</h2>
-            <button
-              className="popup__dismiss"
-              onClick={onClose}
-              aria-label="Закрыть"
-            >
-              <img src="/images/admin/close.png" alt="Закрыть" />
-            </button>
+            <h2 className="popup__title">
+              {title}
+              <a
+                className="popup__dismiss"
+                href="#"
+                onClick={handleClose}
+              >
+                <img src="/images/admin/close.png" alt="Закрыть" />
+              </a>
+            </h2>
           </div>
-
-          {/* Content */}
           <div className="popup__wrapper">
             {children}
           </div>
-
         </div>
       </div>
     </div>

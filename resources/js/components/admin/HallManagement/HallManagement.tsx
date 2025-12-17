@@ -11,7 +11,7 @@ interface HallManagementProps {
   isOpen: boolean;
   onToggle: () => void;
   halls: CinemaHall[];
-  onHallCreated: (newHall: CinemaHall) => void;
+  onHallCreated: (hall: CinemaHall) => void;
   onHallDeleted: (hallId: string) => void;
 }
 
@@ -28,11 +28,12 @@ export const HallManagement: React.FC<HallManagementProps> = ({
   const [hallToDelete, setHallToDelete] = useState<CinemaHall | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ----------------------
+  // ----------------------------------
   // Добавление зала
-  // ----------------------
+  // ----------------------------------
   const handleAddHall = async (e: React.FormEvent) => {
     e.preventDefault();
+
     const name = newHallName.trim();
     if (!name) {
       alert('Название зала не может быть пустым');
@@ -48,14 +49,26 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       const res = await axios.post('/api/halls', {
         name,
         rows: 10,
-        seats_per_row: 8,
-        is_active: true,
+        seatsPerRow: 8,
+        standardPrice: 300,
+        vipPrice: 500,
+        layout: null,
       });
-      onHallCreated(res.data);
+      
+      const newHall: CinemaHall = res.data.data;
+      onHallCreated(newHall);
+
       setIsAddHallPopupOpen(false);
       setNewHallName('');
-    } catch (err) {
-      alert('Не удалось создать зал. Попробуйте ещё раз.');
+    } catch (err: any) {
+      console.error('Create hall error:', err.response?.data);
+
+      if (err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0] as string[];
+        alert(firstError[0]);
+      } else {
+        alert('Не удалось создать зал');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,9 +79,9 @@ export const HallManagement: React.FC<HallManagementProps> = ({
     setNewHallName('');
   };
 
-  // ----------------------
+  // ----------------------------------
   // Удаление зала
-  // ----------------------
+  // ----------------------------------
   const handleDeleteClick = (hall: CinemaHall) => {
     setHallToDelete(hall);
     setIsDeletePopupOpen(true);
@@ -84,7 +97,7 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       onHallDeleted(hallToDelete.id);
       setIsDeletePopupOpen(false);
       setHallToDelete(null);
-    } catch {
+    } catch (err) {
       alert('Не удалось удалить зал. Попробуйте ещё раз.');
     } finally {
       setIsLoading(false);
@@ -105,25 +118,36 @@ export const HallManagement: React.FC<HallManagementProps> = ({
               {hall.name}
               <ConfigButton
                 variant="trash"
-                onClick={() => handleDeleteClick(hall)}
                 title="Удалить зал"
+                onClick={() => handleDeleteClick(hall)}
                 disabled={isLoading}
               />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="conf-step__paragraph" style={{ color: '#848484', fontStyle: 'italic' }}>
-          Пока нет созданных залов. Нажмите "Создать зал", чтобы добавить первый зал.
+        <p
+          className="conf-step__paragraph"
+          style={{ color: '#848484', fontStyle: 'italic' }}
+        >
+          Пока нет созданных залов. Нажмите «Создать зал», чтобы добавить первый зал.
         </p>
       )}
 
-      <ConfigButton variant="accent" onClick={() => setIsAddHallPopupOpen(true)} disabled={isLoading}>
+      <ConfigButton
+        variant="accent"
+        onClick={() => setIsAddHallPopupOpen(true)}
+        disabled={isLoading}
+      >
         Создать зал
       </ConfigButton>
 
       {/* Попап добавления */}
-      <Popup isOpen={isAddHallPopupOpen} onClose={cancelAddHall} title="Добавление зала">
+      <Popup
+        isOpen={isAddHallPopupOpen}
+        onClose={cancelAddHall}
+        title="Добавление зала"
+      >
         <form onSubmit={handleAddHall}>
           <label className="conf-step__label conf-step__label-fullsize">
             Название зала
@@ -138,11 +162,22 @@ export const HallManagement: React.FC<HallManagementProps> = ({
               disabled={isLoading}
             />
           </label>
+
           <div className="conf-step__buttons text-center">
-            <ConfigButton variant="accent" type="submit" disabled={isLoading}>
-              {isLoading ? 'Создание...' : 'Добавить зал'}
+            <ConfigButton
+              variant="accent"
+              type="submit"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Создание…' : 'Добавить зал'}
             </ConfigButton>
-            <ConfigButton variant="regular" type="button" onClick={cancelAddHall} disabled={isLoading}>
+
+            <ConfigButton
+              variant="regular"
+              type="button"
+              onClick={cancelAddHall}
+              disabled={isLoading}
+            >
               Отменить
             </ConfigButton>
           </div>
@@ -150,15 +185,19 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       </Popup>
 
       {/* Попап удаления */}
-      <Popup isOpen={isDeletePopupOpen} onClose={cancelDelete} title="Удаление зала">
+      <Popup
+        isOpen={isDeletePopupOpen}
+        onClose={cancelDelete}
+        title="Удаление зала"
+      >
         <DeleteForm
           message="Вы действительно хотите удалить зал"
           itemName={hallToDelete?.name || ''}
           onSubmit={confirmDelete}
           onCancel={cancelDelete}
-          submitText={isLoading ? 'Удаляем...' : 'Удалить'}
+          submitText={isLoading ? 'Удаляем…' : 'Удалить'}
         />
-      </Popup>
+      </Popup>      
     </ConfigSection>
   );
 };

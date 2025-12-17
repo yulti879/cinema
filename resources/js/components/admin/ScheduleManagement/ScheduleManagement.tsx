@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { CinemaHall, Movie, Screening } from '../../../types';
 import { ConfigSection } from '../ConfigSection/ConfigSection';
 import { ConfigButton } from '../ConfigButton/ConfigButton';
 import { DeleteForm } from '../DeleteForm/DeleteForm';
-import { FormField } from '../FormField/FormField';
-import { Popup } from '../Popup/Popup';
 import { Poster } from '../Poster/Poster';
+import { AddMoviePopup } from '../AddMoviePopup';
+import { AddScreeningPopup } from '../AddScreeningPopup';
 import './ScheduleManagement.css';
 
 interface ScheduleManagementProps {
@@ -23,66 +23,44 @@ interface ScheduleManagementProps {
 export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   isOpen,
   onToggle,
-  halls = [],
-  movies = [],
-  screenings = [],
+  halls,
+  movies,
+  screenings,
   onMovieAdded,
   onMovieDeleted,
   onScreeningAdded,
-  onScreeningDeleted
+  onScreeningDeleted,
 }) => {
-  // Добавляем логирование для отладки
-  console.log('ScheduleManagement received data:', {
-    hallsType: typeof halls,
-    hallsIsArray: Array.isArray(halls),
-    hallsValue: halls,
-    moviesType: typeof movies,
-    moviesIsArray: Array.isArray(movies),
-    moviesValue: movies,
-    screeningsType: typeof screenings,
-    screeningsIsArray: Array.isArray(screenings),
-    screeningsValue: screenings,
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [safeHalls, setSafeHalls] = useState<CinemaHall[]>([]);
+  const [safeMovies, setSafeMovies] = useState<Movie[]>([]);
+  const [safeScreenings, setSafeScreenings] = useState<Screening[]>([]);
 
-  // Защитные массивы на случай, если данные не массивы
-  const safeHalls = Array.isArray(halls) ? halls : [];
-  const safeMovies = Array.isArray(movies) ? movies : [];
-  const safeScreenings = Array.isArray(screenings) ? screenings : [];
-
-  console.log('Safe arrays lengths:', {
-    halls: safeHalls.length,
-    movies: safeMovies.length,
-    screenings: safeScreenings.length,
-  });
-
+  // Попапы и состояния
   const [isAddMoviePopupOpen, setIsAddMoviePopupOpen] = useState(false);
   const [isAddScreeningPopupOpen, setIsAddScreeningPopupOpen] = useState(false);
   const [isDeleteMoviePopupOpen, setIsDeleteMoviePopupOpen] = useState(false);
   const [isDeleteScreeningPopupOpen, setIsDeleteScreeningPopupOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isPosterUploading, setIsPosterUploading] = useState(false);
 
   const [movieToDelete, setMovieToDelete] = useState<Movie | null>(null);
   const [screeningToDelete, setScreeningToDelete] = useState<Screening | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const [newMovie, setNewMovie] = useState({
-    title: '',
-    duration: '',
-    synopsis: '',
-    origin: '',
-    posterUrl: ''
-  });
+  // ----------------------------
+  // Обновление safe массивов при приходе props
+  // ----------------------------
+  useEffect(() => {
+    if (Array.isArray(halls) && Array.isArray(movies) && Array.isArray(screenings)) {
+      setSafeHalls(halls);
+      setSafeMovies(movies);
+      setSafeScreenings(screenings);
+      setIsLoading(false);
+    }
+  }, [halls, movies, screenings]);
 
-  const [newScreening, setNewScreening] = useState({
-    hallId: '',
-    movieId: '',
-    startTime: '10:00',
-    date: new Date().toISOString().split('T')[0]
-  });
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  // ----------------------------
+  // Вспомогательные функции
+  // ----------------------------
   const getTimeInMinutes = (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
@@ -101,107 +79,17 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       });
   };
 
-  // Загрузка постера через fetch
-  const uploadPosterToServer = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('poster', file);
-
-    const response = await fetch('/api/upload-poster', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error('Не удалось загрузить постер');
-    }
-
-    const data = await response.json();
-    return data.url;
+  const getTimePosition = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return (hours * 60 + minutes) * 0.5;
   };
 
-  const handleUploadPosterClick = () => {
-    fileInputRef.current?.click();
-  };
+  const getMovieTitle = (movieId: string) => safeMovies.find(m => m.id === movieId)?.title || 'Неизвестный фильм';
+  const getHallName = (hallId: string) => safeHalls.find(h => h.id === hallId)?.name || 'Неизвестный зал';
 
-  const handlePosterSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 5MB');
-      return;
-    }
-
-    try {
-      setIsPosterUploading(true);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setNewMovie(prev => ({ ...prev, posterUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-
-      const posterUrl = await uploadPosterToServer(file);
-      setNewMovie(prev => ({ ...prev, posterUrl }));
-      alert('Постер успешно загружен!');
-    } catch (err) {
-      console.error(err);
-      alert('Ошибка при загрузке постера');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } finally {
-      setIsPosterUploading(false);
-    }
-  };
-
-  const removePoster = () => {
-    setNewMovie(prev => ({ ...prev, posterUrl: '' }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  // Обработчики для фильмов
-  const handleAddMovie = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMovie.title.trim() && newMovie.duration.trim() && newMovie.synopsis.trim() && newMovie.origin.trim()) {
-      try {
-        setIsUploading(true);
-        
-        const posterUrl = newMovie.posterUrl || '/images/posters/default.jpg';
-        
-        const movie: Movie = {
-          id: '0',
-          title: newMovie.title,
-          poster: posterUrl,
-          synopsis: newMovie.synopsis,
-          duration: parseInt(newMovie.duration) || 120,
-          origin: newMovie.origin
-        };
-        
-        await onMovieAdded(movie);
-        
-        setIsAddMoviePopupOpen(false);
-        setNewMovie({ 
-          title: '', 
-          duration: '', 
-          synopsis: '', 
-          origin: '',
-          posterUrl: ''
-        });
-        setHasUnsavedChanges(true);
-        
-      } catch (error) {
-        console.error('Ошибка при добавлении фильма:', error);
-        alert('Ошибка при добавлении фильма');
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      alert('Заполните все обязательные поля');
-    }
-  };
-
+  // ----------------------------
+  // Работа с удалением
+  // ----------------------------
   const handleDeleteMovie = (movie: Movie) => {
     setMovieToDelete(movie);
     setIsDeleteMoviePopupOpen(true);
@@ -211,56 +99,13 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
     e.preventDefault();
     if (movieToDelete && onMovieDeleted) {
       onMovieDeleted(movieToDelete.id);
-      setIsDeleteMoviePopupOpen(false);
       setMovieToDelete(null);
+      setIsDeleteMoviePopupOpen(false);
       setHasUnsavedChanges(true);
     }
   };
 
-  const cancelDeleteMovie = () => {
-    setIsDeleteMoviePopupOpen(false);
-    setMovieToDelete(null);
-  };
-
-  // Обработчики для сеансов
-  const handleAddScreening = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newScreening.hallId && newScreening.movieId && newScreening.startTime) {
-      const movie = safeMovies.find(m => m.id === newScreening.movieId);
-      const hall = safeHalls.find(h => h.id === newScreening.hallId);
-      
-      if (!movie || !hall) {
-        alert('Ошибка: фильм или зал не найден');
-        return;
-      }
-
-      if (hasTimeConflict(newScreening.hallId, newScreening.startTime, newScreening.date, movie.duration)) {
-        alert('Невозможно добавить сеанс: время пересекается с существующим сеансом');
-        return;
-      }
-
-      const screening: Omit<Screening, 'id'> = {
-        movieId: movie.id,
-        hallId: hall.id,
-        startTime: newScreening.startTime,
-        date: newScreening.date,
-        duration: movie.duration
-      };
-
-      onScreeningAdded(screening);
-      setIsAddScreeningPopupOpen(false);
-      setNewScreening({ 
-        hallId: '', 
-        movieId: '', 
-        startTime: '10:00', 
-        date: new Date().toISOString().split('T')[0] 
-      });
-      setHasUnsavedChanges(true);
-    }
-  };
-
-  const handleDeleteScreening = (screening: Screening, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteScreening = (screening: Screening) => {
     setScreeningToDelete(screening);
     setIsDeleteScreeningPopupOpen(true);
   };
@@ -269,408 +114,113 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
     e.preventDefault();
     if (screeningToDelete && onScreeningDeleted) {
       onScreeningDeleted(screeningToDelete.id);
-      setIsDeleteScreeningPopupOpen(false);
       setScreeningToDelete(null);
+      setIsDeleteScreeningPopupOpen(false);
       setHasUnsavedChanges(true);
     }
   };
 
-  // Обработчики отмены
-  const cancelAddMovie = () => {
-    setIsAddMoviePopupOpen(false);
-    setNewMovie({ 
-      title: '', 
-      duration: '', 
-      synopsis: '', 
-      origin: '',
-      posterUrl: ''
-    });
-  };
+  // ----------------------------
+  // Loader
+  // ----------------------------
+  if (isLoading) {
+    return (
+      <ConfigSection title="Сетка сеансов" isOpen={isOpen} onToggle={onToggle}>
+        <p style={{ fontStyle: 'italic', color: '#848484' }}>Загрузка данных...</p>
+      </ConfigSection>
+    );
+  }
 
-  const cancelAddScreening = () => {
-    setIsAddScreeningPopupOpen(false);
-    setNewScreening({ 
-      hallId: '', 
-      movieId: '', 
-      startTime: '10:00', 
-      date: new Date().toISOString().split('T')[0] 
-    });
-  };
-
-  const cancelDeleteScreening = () => {
-    setIsDeleteScreeningPopupOpen(false);
-    setScreeningToDelete(null);
-  };
-
-  // Обработчики сохранения и отмены
-  const handleSave = () => {
-    console.log('Сохранение всех изменений сетки сеансов');
-    setHasUnsavedChanges(false);
-    alert('Все изменения успешно сохранены!');
-  };
-
-  const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      const confirmCancel = window.confirm(
-        'У вас есть несохраненные изменения. Вы уверены, что хотите отменить?'
-      );
-      if (!confirmCancel) return;
-    }
-    
-    setHasUnsavedChanges(false);
-    console.log('Отмена изменений');
-  };
-
-  // Вспомогательные функции
-  const getTimePosition = (time: string): number => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours * 60 + minutes) * 0.5;
-  };
-
-  const getMovieTitle = (movieId: string): string => {
-    return safeMovies.find(m => m.id === movieId)?.title || 'Неизвестный фильм';
-  };
-
-  const getHallName = (hallId: string): string => {
-    return safeHalls.find(h => h.id === hallId)?.name || 'Неизвестный зал';
-  };
-
+  // ----------------------------
+  // Render
+  // ----------------------------
   return (
-    <ConfigSection
-      title={`Сетка сеансов${hasUnsavedChanges ? ' *' : ''}`}
-      isOpen={isOpen}
-      onToggle={onToggle}
-    >
+    <ConfigSection title={`Сетка сеансов${hasUnsavedChanges ? ' *' : ''}`} isOpen={isOpen} onToggle={onToggle}>
+      {/* Кнопки для добавления */}
       <p className="conf-step__paragraph">
-        <ConfigButton
-          variant="accent"
-          onClick={() => setIsAddMoviePopupOpen(true)}
-        >
-          Добавить фильм
-        </ConfigButton>
+        <ConfigButton variant="accent" onClick={() => setIsAddMoviePopupOpen(true)}>Добавить фильм</ConfigButton>
+      </p>
+      <p className="conf-step__paragraph">
+        <ConfigButton variant="accent" onClick={() => setIsAddScreeningPopupOpen(true)}>Добавить сеанс</ConfigButton>
       </p>
 
-      {/* Попап добавления фильма */}
-      <Popup
-        isOpen={isAddMoviePopupOpen}
-        onClose={cancelAddMovie}
-        title="Добавление фильма"
-      >
-        <form onSubmit={handleAddMovie}>
-          <div className="popup__container">
-            <div className="popup__poster">
-              <div className="poster-upload">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handlePosterSelect}
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                />
-                {newMovie.posterUrl ? (
-                  <div className="poster-preview">
-                    <img 
-                      src={newMovie.posterUrl} 
-                      alt="Preview" 
-                      className="poster-preview-image"
-                    />
-                    <button
-                      type="button"
-                      className="poster-remove"
-                      onClick={removePoster}
-                      title="Удалить постер"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div className="poster-placeholder">
-                    <span>🎬</span>
-                    <p>Постер не загружен</p>
-                    <p className="poster-hint">Нажмите "Загрузить постер"</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="popup__form">
-              <FormField
-                label="Название фильма"
-                name="title"
-                type="text"
-                placeholder="Например, «Гражданин Кейн»"
-                value={newMovie.title}
-                onChange={(e) => setNewMovie(prev => ({ ...prev, title: e.target.value }))}
-                required
-              />
-              <FormField
-                label="Продолжительность фильма (мин.)"
-                name="duration"
-                type="number"
-                placeholder="120"
-                value={newMovie.duration}
-                onChange={(e) => setNewMovie(prev => ({ ...prev, duration: e.target.value }))}
-                min="1"
-                required
-              />
-              <FormField
-                label="Описание фильма"
-                name="synopsis"
-                type="textarea"
-                placeholder="Краткое описание сюжета..."
-                value={newMovie.synopsis}
-                onChange={(e) => setNewMovie(prev => ({ ...prev, synopsis: e.target.value }))}
-                rows={4}
-                required
-              />
-              <FormField
-                label="Страна производства"
-                name="origin"
-                type="text"
-                placeholder="Например, США, Франция, Россия"
-                value={newMovie.origin}
-                onChange={(e) => setNewMovie(prev => ({ ...prev, origin: e.target.value }))}
-                required
-              />
-            </div>
-          </div>
-          
-          <div className="conf-step__buttons text-center">
-            <ConfigButton
-              variant="accent"
-              type="submit"
-              disabled={isUploading}
-            >
-              {isUploading ? 'Добавление...' : 'Добавить фильм'}
-            </ConfigButton>
-            <ConfigButton
-              variant="accent"
-              type="button"
-              onClick={handleUploadPosterClick}
-              disabled={isPosterUploading}
-            >
-              {isPosterUploading ? 'Загрузка...' : 'Загрузить постер'}
-            </ConfigButton>
-            <ConfigButton
-              variant="regular"
-              onClick={cancelAddMovie}
-              type="button"
-              disabled={isUploading || isPosterUploading}
-            >
-              Отменить
-            </ConfigButton>
-          </div>
-        </form>
-      </Popup>      
-
-      {/* Попап удаления фильма */}
-      <Popup
-        isOpen={isDeleteMoviePopupOpen}
-        onClose={cancelDeleteMovie}
-        title="Удаление фильма"
-      >
-        <DeleteForm
-          message="Вы действительно хотите удалить фильм"
-          itemName={movieToDelete?.title || ''}
-          onSubmit={confirmDeleteMovie}
-          onCancel={cancelDeleteMovie}
-          submitText="Удалить"
-        />
-      </Popup>
-
-      {/* Попап добавления сеанса */}
-      <Popup
-        isOpen={isAddScreeningPopupOpen}
-        onClose={cancelAddScreening}
-        title="Добавление сеанса"
-      >
-        <form onSubmit={handleAddScreening}>
-          <FormField
-            label="Зал"
-            name="hallId"
-            type="select"
-            value={newScreening.hallId}
-            onChange={(e) => setNewScreening(prev => ({ ...prev, hallId: e.target.value }))}
-            options={[
-              { value: '', label: 'Выберите зал' },
-              ...safeHalls.map(hall => ({ value: hall.id, label: hall.name }))
-            ]}
-            required
-          />
-          <FormField
-            label="Фильм"
-            name="movieId"
-            type="select"
-            value={newScreening.movieId}
-            onChange={(e) => setNewScreening(prev => ({ ...prev, movieId: e.target.value }))}
-            options={[
-              { value: '', label: 'Выберите фильм' },
-              ...safeMovies.map(movie => ({ value: movie.id, label: movie.title }))
-            ]}
-            required
-          />
-          <FormField
-            label="Дата сеанса"
-            name="date"
-            type="date"
-            value={newScreening.date}
-            onChange={(e) => setNewScreening(prev => ({ ...prev, date: e.target.value }))}
-            required
-          />
-          <FormField
-            label="Время начала"
-            name="startTime"
-            type="time"
-            value={newScreening.startTime}
-            onChange={(e) => setNewScreening(prev => ({ ...prev, startTime: e.target.value }))}
-            required
-          />
-          
-          <div className="conf-step__buttons text-center">
-            <ConfigButton
-              variant="accent"
-              type="submit"
-            >
-              Добавить сеанс
-            </ConfigButton>
-            <ConfigButton
-              variant="regular"
-              onClick={cancelAddScreening}
-              type="button"
-            >
-              Отменить
-            </ConfigButton>
-          </div>
-        </form>
-      </Popup>
-
-      {/* Попап удаления сеанса */}
-      <Popup
-        isOpen={isDeleteScreeningPopupOpen}
-        onClose={cancelDeleteScreening}
-        title="Снятие с сеанса"
-      >
-        <DeleteForm
-          message="Вы действительно хотите снять с сеанса фильм"
-          itemName={screeningToDelete ? getMovieTitle(screeningToDelete.movieId) : ''}
-          onSubmit={confirmDeleteScreening}
-          onCancel={cancelDeleteScreening}
-          submitText="Удалить"
-        />
-      </Popup>
-
       {/* Список фильмов */}
-      <div className="conf-step__movies">
-        {safeMovies.length > 0 ? (
-          safeMovies.map(movie => (
-            <div key={movie.id} className="conf-step__movie">
-              <Poster
-                src={movie.poster}
-                alt={`Постер фильма ${movie.title}`}
-              />
-              <div className="conf-step__movie-info">
-                <h3 className="conf-step__movie-title">{movie.title}</h3>
-                <p className="conf-step__movie-duration">{movie.duration} минут</p>
-                <p className="conf-step__movie-origin">{movie.origin}</p>
-              </div>
-              <ConfigButton
-                variant="trash"
-                onClick={() => handleDeleteMovie(movie)}
-                title="Удалить фильм"
-                className="conf-step__movie-delete"
-              />
+      {safeMovies.length > 0 ? (
+        safeMovies.map(movie => (
+          <div key={movie.id} className="conf-step__movie">
+            <Poster src={movie.poster} alt={movie.title} />
+            <div className="conf-step__movie-info">
+              <h3>{movie.title}</h3>
+              <p>{movie.duration} мин.</p>
+              <p>{movie.origin}</p>
             </div>
-          ))
-        ) : (
-          <p className="conf-step__paragraph" style={{ color: '#848484', fontStyle: 'italic' }}>
-            Пока нет добавленных фильмов. Нажмите "Добавить фильм" чтобы добавить первый фильм.
-          </p>
-        )}
-        
-        <p className="conf-step__paragraph">
-          <ConfigButton
-            variant="accent"
-            onClick={() => setIsAddScreeningPopupOpen(true)}
-          >
-            Добавить сеанс
-          </ConfigButton>
-        </p>
-      </div>
-
-      {/* Расписание сеансов */}
-      <div className="conf-step__seances">
-        {safeHalls.length > 0 ? (
-          safeHalls.map(hall => (
-            <div key={hall.id} className="conf-step__seances-hall">
-              <h3 className="conf-step__seances-title">{hall.name}</h3>
-              <div className="conf-step__seances-timeline">
-                {safeScreenings
-                  .filter(screening => screening.hallId === hall.id)
-                  .map(screening => {
-                    const movie = safeMovies.find(m => m.id === screening.movieId);
-                    return (
-                      <div
-                        key={screening.id}
-                        className="conf-step__seances-movie"
-                        style={{
-                          width: `${screening.duration}px`,
-                          backgroundColor: `hsl(${Math.random() * 360}, 70%, 80%)`,
-                          left: `${getTimePosition(screening.startTime)}px`
-                        }}
-                      >
-                        <p className="conf-step__seances-movie-title">
-                          {movie?.title || 'Неизвестный фильм'}
-                        </p>
-                        <p className="conf-step__seances-movie-start">{screening.startTime}</p>
-                        
-                        <ConfigButton 
-                          variant="trash"
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            handleDeleteScreening(screening, e);
-                          }}
-                          title="Удалить сеанс"
-                          className="trash-seance-button"
-                        />
-                      </div>
-                    );
-                  })
-                }
-                
-                {safeScreenings.filter(s => s.hallId === hall.id).length === 0 && (
-                  <div className="conf-step__seances-empty">
-                    Нет сеансов в этом зале
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="conf-step__seances-empty">
-            <p className="conf-step__paragraph" style={{ color: '#848484', fontStyle: 'italic' }}>
-              Нет доступных залов. Сначала добавьте залы в разделе "Конфигурация залов".
-            </p>
+            <ConfigButton variant="trash" onClick={() => handleDeleteMovie(movie)} title="Удалить фильм" />
           </div>
-        )}
-      </div>
+        ))
+      ) : (
+        <p style={{ color: '#848484', fontStyle: 'italic' }}>Пока нет добавленных фильмов.</p>
+      )}
 
-      {/* Кнопки сохранения и отмены */}
-      <fieldset className="conf-step__buttons text-center">
-        <ConfigButton 
-          variant="regular" 
-          onClick={handleCancel}
-          disabled={!hasUnsavedChanges}
-        >
-          Отмена
-        </ConfigButton>
-        <ConfigButton 
-          variant="accent" 
-          onClick={handleSave}
-          disabled={!hasUnsavedChanges}
-        >
-          Сохранить
-        </ConfigButton>
-      </fieldset>
+      {/* Сетка сеансов по залам */}
+      {safeHalls.map(hall => (
+        <div key={hall.id}>
+          <h3>{hall.name}</h3>
+          <div className="conf-step__seances-timeline">
+            {safeScreenings.filter(s => s.hallId === hall.id).map(screening => (
+              <div
+                key={screening.id}
+                className="conf-step__seances-movie"
+                style={{ left: `${getTimePosition(screening.startTime)}px`, width: `${screening.duration}px` }}
+              >
+                <p>{getMovieTitle(screening.movieId)}</p>
+                <p>{screening.startTime}</p>
+                <ConfigButton variant="trash" onClick={() => handleDeleteScreening(screening)} />
+              </div>
+            ))}
+            {safeScreenings.filter(s => s.hallId === hall.id).length === 0 && (
+              <div>Нет сеансов в этом зале</div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* Попапы */}
+      <AddMoviePopup
+        isOpen={isAddMoviePopupOpen}
+        onClose={() => setIsAddMoviePopupOpen(false)}
+        onMovieAdded={onMovieAdded}
+      />
+
+      <AddScreeningPopup
+        isOpen={isAddScreeningPopupOpen}
+        onClose={() => setIsAddScreeningPopupOpen(false)}
+        halls={safeHalls}
+        movies={safeMovies}
+        onAddScreening={screening => {
+          const movie = safeMovies.find(m => m.id === screening.movieId);
+          if (!movie) return;
+          onScreeningAdded({ ...screening, duration: movie.duration });
+        }}
+      />
+
+      {/* Delete попапы */}
+      {isDeleteMoviePopupOpen && movieToDelete && (
+        <DeleteForm
+          message="Вы уверены, что хотите удалить фильм"
+          itemName={movieToDelete.title}
+          onSubmit={confirmDeleteMovie}
+          onCancel={() => setIsDeleteMoviePopupOpen(false)}
+        />
+      )}
+
+      {isDeleteScreeningPopupOpen && screeningToDelete && (
+        <DeleteForm
+          message="Вы уверены, что хотите удалить сеанс"
+          itemName={`${getMovieTitle(screeningToDelete.movieId)} ${screeningToDelete.startTime}`}
+          onSubmit={confirmDeleteScreening}
+          onCancel={() => setIsDeleteScreeningPopupOpen(false)}
+        />
+      )}
     </ConfigSection>
   );
 };

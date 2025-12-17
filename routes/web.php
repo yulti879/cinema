@@ -35,6 +35,8 @@ Route::middleware('web')->group(function () {
             // Залы
             Route::get('/halls', [HallController::class, 'index']);
             Route::post('/halls', [HallController::class, 'store']);
+            Route::put('/halls/{id}', [HallController::class, 'update']);   // PUT для обновления
+            Route::patch('/halls/{id}', [HallController::class, 'update']); // PATCH (частичное обновление, опционально)
             Route::delete('/halls/{id}', [HallController::class, 'destroy']);
 
             // Фильмы
@@ -49,6 +51,7 @@ Route::middleware('web')->group(function () {
         });
     });
 
+    // Catch-all для SPA
     Route::get('/{any}', function () {
         return view('app');
     })->where('any', '.*');
