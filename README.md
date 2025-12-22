@@ -1,3 +1,3 @@
+Осталось добавить почты клиентов для высылки QR-кода билета
 
-
-composer require simplesoftwareio/simple-qrcode
+и написать README
