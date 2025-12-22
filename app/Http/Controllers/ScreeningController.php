@@ -41,7 +41,7 @@ class ScreeningController extends Controller
     }
 
     /**
-     * Создание сеанса (админ)
+     * Создание сеанса
      */
     public function store(Request $request)
     {

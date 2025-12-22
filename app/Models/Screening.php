@@ -12,14 +12,14 @@ class Screening extends Model
         'date',
         'start_time',
         'duration',
-        'booked_seats', // хранится как JSON
+        'booked_seats',
     ];
 
     // Автоматическая конвертация booked_seats между JSON и массивом
     protected $casts = [
         'booked_seats' => 'array',
         'date'         => 'date',
-        'start_time'   => 'datetime:H:i', // можно настроить формат по необходимости
+        'start_time'   => 'datetime:H:i',
     ];
 
     /**

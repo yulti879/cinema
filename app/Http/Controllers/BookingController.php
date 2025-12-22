@@ -14,21 +14,25 @@ class BookingController extends Controller
         $data = $request->validate([
             'screening_id' => 'required|exists:screenings,id',
             'seats'        => 'required|array|min:1',
+            'seats.*.row'  => 'required|integer|min:1',
+            'seats.*.seat' => 'required|integer|min:1',
+            'seats.*.type' => 'required|in:standard,vip',
         ]);
 
-        $screening = Screening::with('hall')->findOrFail($data['screeningId']);
+        $screening = Screening::with('hall')->findOrFail($data['screening_id']);
 
-        // Проверка занятости мест
         $bookedSeats = $screening->booked_seats ?? [];
+
         foreach ($data['seats'] as $seat) {
-            if (in_array($seat, $bookedSeats)) {
+            $seatKey = "{$seat['row']}-{$seat['seat']}";
+
+            if (in_array($seatKey, $bookedSeats, true)) {
                 return response()->json([
-                    'error' => "Seat row {$seat['row']} seat {$seat['seat']} is already booked"
+                    'error' => "Место {$seatKey} уже забронировано"
                 ], 422);
             }
         }
 
-        // Расчёт total_price на сервере
         $totalPrice = 0;
         foreach ($data['seats'] as $seat) {
             $totalPrice += $seat['type'] === 'vip'
@@ -36,10 +40,8 @@ class BookingController extends Controller
                 : $screening->hall->standard_price;
         }
 
-        // Генерация уникального кода бронирования
-        $bookingCode = strtoupper('BK'.Str::random(6));
+        $bookingCode = 'BK' . strtoupper(Str::random(6));
 
-        // Создание бронирования
         $booking = Booking::create([
             'screening_id' => $screening->id,
             'seats' => $data['seats'],
@@ -47,13 +49,25 @@ class BookingController extends Controller
             'booking_code' => $bookingCode,
         ]);
 
-        // Обновляем booked_seats в Screening
-        $screening->booked_seats = array_merge($bookedSeats, $data['seats']);
+        $newBookedSeats = array_map(
+            fn($seat) => "{$seat['row']}-{$seat['seat']}",
+            $data['seats']
+        );
+
+        $screening->booked_seats = array_merge($bookedSeats, $newBookedSeats);
         $screening->save();
 
         return response()->json([
             'booking_code' => $bookingCode,
-            'qr_code_url' => route('bookings.qr', $bookingCode)
+            'qr_code_url' => route('bookings.qr', $bookingCode),
+        ], 201);
+    }
+
+    public function qr(string $code)
+    {
+        return response()->json([
+            'booking_code' => $code,
+            'message' => 'QR will be here'
         ]);
     }
 }

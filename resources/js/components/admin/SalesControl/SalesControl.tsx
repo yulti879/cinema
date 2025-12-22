@@ -41,7 +41,7 @@ export const SalesControl: React.FC<SalesControlProps> = ({
       try {
         const res = await axios.post('/api/sales', { open: true });
         setSalesOpen(res.data.open);
-        onSalesToggle(res.data.open); // передаем реальное значение
+        onSalesToggle(res.data.open);
       } catch (err) {
         alert('Ошибка при открытии продаж');
       } finally {
@@ -58,7 +58,7 @@ export const SalesControl: React.FC<SalesControlProps> = ({
     try {
       const res = await axios.post('/api/sales', { open: false });
       setSalesOpen(res.data.open);
-      onSalesToggle(res.data.open); // передаем реальное значение
+      onSalesToggle(res.data.open);
     } catch (err) {
       alert('Ошибка при приостановке продаж');
     } finally {

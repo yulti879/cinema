@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { ClientMovie, HallSchedule } from '../types/client';
-import type { ApiMovie, ApiScreening } from '../types/client'; // новые интерфейсы
+import type { ApiMovie, ApiScreening } from '../types/client';
 
 interface CinemaContextType {
   movies: ClientMovie[];

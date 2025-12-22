@@ -3,13 +3,12 @@ import './TicketLayout.css';
 interface TicketLayoutProps {
   type: 'payment' | 'ticket';
   movieTitle: string;
-  seats: string[];
+  seats: string[];             // массив строк: "Ряд 1, Место 3"
   hall: string;
   startTime: string;
   date: string;
   cost?: number;
-  qrCode?: string;
-  qrCodeUrl?: string;
+  qrCodeUrl?: string;          // URL QR-кода
   bookingCode?: string;
   onGetTicket?: () => void;
   isButtonDisabled?: boolean;
@@ -23,7 +22,6 @@ export const TicketLayout: React.FC<TicketLayoutProps> = ({
   startTime,
   date,
   cost,
-  qrCode,
   qrCodeUrl,
   bookingCode,
   onGetTicket,
@@ -69,11 +67,11 @@ export const TicketLayout: React.FC<TicketLayoutProps> = ({
             </p>
           )}
 
-          {type === 'ticket' && (qrCodeUrl || qrCode) && (
+          {type === 'ticket' && qrCodeUrl && (
             <div className="ticket__info-qr-container">
               <img
                 className="ticket__info-qr"
-                src={qrCodeUrl || qrCode}
+                src={qrCodeUrl}
                 alt="QR код билета"
               />
               <p className="ticket__qr-hint">Покажите QR-код контролёру</p>

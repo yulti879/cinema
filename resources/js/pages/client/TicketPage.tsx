@@ -10,11 +10,7 @@ export const TicketPage: React.FC = () => {
 
   const ticket = location.state as Ticket | null;
 
-  if (
-    !ticket ||
-    !Array.isArray(ticket.seats) ||
-    ticket.seats.length === 0
-  ) {
+  if (!ticket || !Array.isArray(ticket.seats) || ticket.seats.length === 0) {
     return (
       <ClientLayout>
         <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -31,7 +27,7 @@ export const TicketPage: React.FC = () => {
       <TicketLayout
         type="ticket"
         movieTitle={ticket.movieTitle}
-        seats={ticket.seats} // массив строк
+        seats={ticket.seats}
         hall={ticket.hallName}
         startTime={ticket.startTime}
         date={ticket.date}

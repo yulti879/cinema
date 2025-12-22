@@ -1,17 +1,16 @@
-// resources/js/components/admin/LoginForm/LoginForm.tsx
 import React, { useState } from 'react';
 import './LoginForm.css';
 
 interface LoginFormProps {
-  onLogin: (email: string, password: string) => void; // ✅ camelCase
+  onLogin: (email: string, password: string) => void;
   error?: string;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, error }) => {
-  const [email, setEmail] = useState(''); // ✅ camelCase
-  const [password, setPassword] = useState(''); // ✅ camelCase
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => { // ✅ camelCase
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onLogin(email, password);
   };
@@ -31,7 +30,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, error }) => {
                 className="login__input"
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)} // ✅
+                onChange={e => setEmail(e.target.value)}
                 required
               />
             </label>
@@ -42,7 +41,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, error }) => {
                 className="login__input"
                 type="password"
                 value={password}
-                onChange={e => setPassword(e.target.value)} // ✅
+                onChange={e => setPassword(e.target.value)}
                 required
               />
             </label>

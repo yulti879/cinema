@@ -24,8 +24,7 @@ class MovieController extends Controller
 
     /**
      * Создать новый фильм
-     */
-    // app/Http/Controllers/MovieController.php
+     */    
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -121,7 +120,7 @@ class MovieController extends Controller
 
     $movie->delete();
 
-    // Возвращаем 200 и пустой объект, чтобы Axios точно не ругался
+    // Возвращаем 200 и пустой объект
     return response()->json(['message' => 'Фильм успешно удален'], 200);
 }
 }

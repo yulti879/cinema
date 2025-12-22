@@ -44,6 +44,8 @@ Route::middleware('web')->group(function () {
         // Бронирование (гости)
         Route::post('/bookings', [BookingController::class, 'store']);
         Route::get('/bookings/{code}', [BookingController::class, 'show']);
+        Route::get('/bookings/{code}/qr', [BookingController::class, 'qr'])
+            ->name('bookings.qr');
 
         // ---------- ЗАЩИЩЁННЫЕ API ----------
         Route::middleware('auth')->group(function () {
@@ -83,8 +85,8 @@ Route::middleware('web')->group(function () {
             Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
 
             // ===== УПРАВЛЕНИЕ ПРОДАЖАМИ =====
-            Route::get('/sales', [SalesController::class, 'get']);   // текущее состояние
-            Route::post('/sales', [SalesController::class, 'set']);  // открыть/закрыть
+            Route::get('/sales', [SalesController::class, 'get']);
+            Route::post('/sales', [SalesController::class, 'set']);
         });
     });
 

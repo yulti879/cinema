@@ -27,8 +27,8 @@ class CreateAdmin extends Command
         $user = User::create([
             'name' => 'Admin',
             'email' => $email,
-            'password' => Hash::make($password), // ← ДОБАВЬТЕ Hash::make
-            'role' => 'admin', // или User::ROLE_ADMIN если есть константа
+            'password' => Hash::make($password),
+            'role' => 'admin',
         ]);
 
         $this->info("✅ Администратор создан!");

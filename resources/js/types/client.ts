@@ -1,19 +1,12 @@
 // ========== БАЗОВЫЕ ТИПЫ ==========
-
 export type SeatType = 'standard' | 'vip' | 'taken' | 'selected';
 
 // ========== ОСНОВНЫЕ СУЩНОСТИ ==========
-
-export interface Booking {
-  id: string;
-  screeningId: string;
-  code: string;                 // Уникальный код брони
-  customerEmail?: string;
-  seats: Seat[];                // Выбранные места
-  totalPrice: number;
-  expiresAt: string;           // Время истечения брони???????
-  isConfirmed: boolean;
-  createdAt: string;
+export interface Seat {
+  type: SeatType;
+  row: number;
+  seat: number;
+  price?: number;
 }
 
 export interface Hall {
@@ -30,7 +23,7 @@ export interface Movie {
   title: string;
   posterUrl?: string;
   synopsis: string;
-  duration: number;      // в минутах
+  duration: number; // в минутах
   origin: string;
 }
 
@@ -38,35 +31,32 @@ export interface Screening {
   id: string;
   movieId: string;
   hallId: string;
-  date: string;         // "YYYY-MM-DD"
+  date: string;        // "YYYY-MM-DD"
   startTime: string;   // "HH:MM"
-  bookedSeats?: string[]; // ["1-1", "1-2"]
+  bookedSeats?: string[];
   movie?: Movie;
   hall?: Hall;
 }
 
-export interface ApiMovie {
-  id: number;
-  title: string;
-  posterUrl?: string;
-  synopsis: string;
-  duration: number;
-  origin: string;
-}
-
-export interface ApiScreening {
-  id: number;
-  movieId: number;
-  hallId: number;
-  date: string;
-  startTime: string;
-  hall?: {
-    id: number;
-    name: string;
-  };
+export interface Booking {
+  id: string;
+  screeningId: string;
+  code: string;
+  customerEmail?: string;
+  seats: Seat[];
+  totalPrice: number;
+  expiresAt: string;
+  isConfirmed: boolean;
+  createdAt: string;
 }
 
 // ========== ТИПЫ ДЛЯ КОМПОНЕНТОВ ==========
+export interface HallSchedule {
+  id: string;
+  name: string;
+  times: string[];
+  screeningIds: string[];
+}
 
 export interface ClientMovie {
   id: string;
@@ -87,23 +77,8 @@ export interface Day {
   weekend: boolean;
 }
 
-export interface HallSchedule {
-  id: string;
-  name: string;
-  times: string[];          // ["10:20", "14:10"]
-  screeningIds: string[];
-}
-
-export interface Seat {
-  type: SeatType;
-  row: number;
-  seat: number;
-  price?: number;
-}
-
 // ========== ТИПЫ ДЛЯ СТРАНИЦ ==========
-
-export interface PaymentData {
+export interface Payment {  
   screeningId: string;
   movieTitle: string;
   startTime: string;
@@ -114,13 +89,45 @@ export interface PaymentData {
   totalPrice?: number;
 }
 
-export interface TicketData {
+export interface Ticket {
   bookingCode: string;
   movieTitle: string;
   startTime: string;
   hallName: string;
   date: string;
   seats: string[]; // ["Ряд 1, Место 3", "Ряд 1, Место 4"]
-  totalPrice: number;
+  totalPrice?: number;
   qrCodeUrl?: string;
+}
+
+// DTO для данных с API
+export interface ApiMovie {
+  id: string | number;
+  title: string;
+  posterUrl?: string;
+  synopsis: string;
+  duration: number;
+  origin: string;
+}
+
+export interface ApiScreening {
+  id: string | number;
+  movieId: string | number;
+  hallId: string | number;
+  date: string;      // "YYYY-MM-DD"
+  startTime: string; // "HH:MM" или ISO
+  hall?: { id: string | number; name: string };
+}
+
+// ========== DTO: отправка бронирования ==========
+
+export interface BookingSeatDTO {
+  row: number;
+  seat: number;
+}
+
+export interface CreateBookingDTO {
+  screening_id: string;
+  seats: BookingSeatDTO[];
+  total_price: number;
 }

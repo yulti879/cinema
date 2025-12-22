@@ -14,8 +14,7 @@ export const Hall: React.FC = () => {
   const [screening, setScreening] = useState<Screening | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Цены мест
+  
   const seatPrices = { standard: 250, vip: 350 };
 
   useEffect(() => {

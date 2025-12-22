@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import type { BookingData, Ticket } from '../../types/client';
+import type { Payment, Ticket } from '../../types/client';
 import { ClientLayout } from '../../components/client/ClientLayout';
 import { ClientHeader } from '../../components/client/ClientHeader/ClientHeader';
 import { TicketLayout } from '../../components/client/TicketLayout/TicketLayout';
@@ -10,13 +10,9 @@ export const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  const bookingData = location.state as BookingData | null;
+  const paymentData = location.state as Payment | null;
 
-  if (
-    !bookingData ||
-    !Array.isArray(bookingData.seats) ||
-    bookingData.seats.length === 0
-  ) {
+  if (!paymentData || paymentData.seats.length === 0) {
     return (
       <ClientLayout>
         <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -28,48 +24,67 @@ export const PaymentPage: React.FC = () => {
   }
 
   const handleGetTicket = async () => {
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          screening_id: bookingData.id,
-          seats: bookingData.seats,
-          total_price: bookingData.totalPrice
-        })
-      });
+  try {
+    const csrfToken = document
+      .querySelector('meta[name="csrf-token"]')
+      ?.getAttribute('content');
 
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data.error || 'Ошибка бронирования');
-        return;
-      }
+    const response = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': csrfToken ?? '',
+      },
+      body: JSON.stringify({
+        screening_id: paymentData.screeningId,
+        seats: paymentData.seats,        
+      }),
+    });
 
-      const ticket = {
-        ...bookingData,
-        qrCodeUrl: data.qr_code_url,
-        bookingCode: data.booking_code
-      };
+    const data = await response.json();
 
-      navigate('/ticket', { state: ticket });
-    } finally {
-      setIsLoading(false);
+    if (!response.ok) {
+      alert(data.message || data.error || 'Ошибка бронирования');
+      return;
     }
-  };
+
+    const ticket: Ticket = {
+      bookingCode: data.booking_code,
+      movieTitle: paymentData.movieTitle,
+      startTime: paymentData.startTime,
+      hallName: paymentData.hallName,
+      date: paymentData.date,
+      seats: paymentData.seats.map(
+        s => `Ряд ${s.row}, Место ${s.seat}`
+      ),
+      totalPrice: paymentData.totalPrice,
+      qrCodeUrl: data.qr_code_url,
+    };
+
+    navigate('/ticket', { state: ticket });
+  } catch (err) {
+    alert(`Ошибка бронирования: ${(err as Error).message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <ClientLayout>
       <ClientHeader />
       <TicketLayout
         type="payment"
-        movieTitle={bookingData.movieTitle}
-        seats={bookingData.seats}
-        hall={bookingData.hallName}
-        startTime={bookingData.startTime}
-        date={bookingData.date}
-        cost={bookingData.totalPrice}
+        movieTitle={paymentData.movieTitle}
+        seats={paymentData.seats.map(
+          s => `Ряд ${s.row}, Место ${s.seat}`
+        )}
+        hall={paymentData.hallName}
+        startTime={paymentData.startTime}
+        date={paymentData.date}
+        cost={paymentData.totalPrice}
         onGetTicket={handleGetTicket}
         isButtonDisabled={isLoading}
       />

@@ -8,8 +8,7 @@ interface MovieCardProps {
   movie: ClientMovie;
 }
 
-export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
-  // Форматируем продолжительность
+export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {  
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;

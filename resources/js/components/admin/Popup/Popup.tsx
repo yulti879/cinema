@@ -1,12 +1,11 @@
-// resources/js/components/admin/Popup/Popup.tsx
 import React, { useEffect, useState } from 'react';
 import './Popup.css';
 
 interface PopupProps {
   title?: string;
   children: React.ReactNode;
-  isOpen?: boolean;      // camelCase для React
-  onClose: () => void;   // camelCase для React
+  isOpen?: boolean;
+  onClose: () => void;
 }
 
 export const Popup: React.FC<PopupProps> = ({ 

@@ -1,4 +1,3 @@
-// resources\js\components\admin\HallConfiguration\HallConfiguration.tsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { AdminHall, AdminSeat } from '../../../types/admin';

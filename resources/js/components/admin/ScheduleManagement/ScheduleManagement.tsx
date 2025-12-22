@@ -288,7 +288,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
 
             if (hallScreenings.length === 0) return null;
 
-            // Для корректного смещения сеансов одного фильма
+            // Для корректного смещения сеансов
             const lastMovieEnd: Record<string, number> = {};
 
             return (
@@ -298,16 +298,13 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
                   {hallScreenings.map(screening => {
                     const movie = localMovies.find(m => m.id === screening.movieId.toString());
                     if (!movie) return null;
-
-                    // Обрезаем до HH:MM
+                    
                     const startTime = screening.startTime.split('T')[1]?.substring(0, 5) || screening.startTime;
-
-                    // Вычисляем позицию и ширину
+                    
                     const [hour, minute] = startTime.split(':').map(Number);
                     let left = (hour * 60 + minute) / (24 * 60) * 100;
                     const width = (movie.duration / (24 * 60)) * 100;
-
-                    // Если у фильма уже есть предыдущий сеанс, добавляем минимальный отступ
+                    
                     if (lastMovieEnd[screening.movieId]) {
                       left = Math.max(left, lastMovieEnd[screening.movieId] + 0.5); // 0.5% отступ
                     }

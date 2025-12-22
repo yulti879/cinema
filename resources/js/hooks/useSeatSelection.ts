@@ -14,7 +14,7 @@ export const useSeatSelection = (maxSeats: number = 6): UseSeatSelectionReturn =
 
   const handleSeatClick = useCallback((rowIndex: number, seatIndex: number, seatType: Seat['type']) => {
     // Игнорируем недоступные места
-    if (seatType === 'disabled' || seatType === 'taken') return;
+    if (seatType === 'taken') return;
 
     const seatId = `${rowIndex + 1}-${seatIndex + 1}`;
 
