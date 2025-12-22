@@ -1,5 +1,5 @@
 import { useCinema } from '../../../context/CinemaContext';
-import { getMondayOfWeek, generateWeekDays } from '../../../utils/dateHelpers';
+import { getMondayOfWeek, generateWeekDays, DAYS_SHORT } from '../../../utils/dateHelpers';
 import type { Day } from '../../../types/client';
 
 import './Navigation.css';
@@ -9,23 +9,36 @@ export const Navigation: React.FC = () => {
 
   const days: Day[] = generateWeekDays(selectedDate);
 
-  const canGoBack =
-    getMondayOfWeek(selectedDate).getTime() >
-    getMondayOfWeek(new Date()).getTime();
+  // Проверяем, можем ли идти назад (не раньше сегодняшней недели)
+  const canGoBack = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentMonday = getMondayOfWeek(today);
+    const selectedMonday = getMondayOfWeek(selectedDate);
+    
+    return selectedMonday.getTime() > currentMonday.getTime();
+  };
 
   const handleChangeWeek = (offset: number) => {
     const monday = getMondayOfWeek(selectedDate);
-    const next = new Date(monday.getTime() + offset * 24 * 60 * 60 * 1000);
-    setSelectedDate(next);
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + offset * 7);
+    
+    // Устанавливаем на понедельник новой недели
+    setSelectedDate(nextMonday);
   };
+
+  // Проверяем, есть ли сегодняшний день в отображаемой неделе
+  const hasToday = days.some(day => day.today);
 
   return (
     <nav className="page-nav">
-      {canGoBack && (
+      {canGoBack() && (
         <button
           className="page-nav__day page-nav__day_prev"
           onClick={() => handleChangeWeek(-7)}
           aria-label="Предыдущая неделя"
+          title="Предыдущая неделя"
         />
       )}
 
@@ -43,6 +56,7 @@ export const Navigation: React.FC = () => {
           onClick={() => setSelectedDate(day.date)}
           aria-current={day.chosen ? 'date' : undefined}
           aria-label={`${day.day} ${day.number}`}
+          title={day.today ? 'Сегодня' : undefined}
         >
           <span className="page-nav__day-week">{day.day}</span>
           <span className="page-nav__day-number">{day.number}</span>
@@ -53,6 +67,7 @@ export const Navigation: React.FC = () => {
         className="page-nav__day page-nav__day_next"
         onClick={() => handleChangeWeek(7)}
         aria-label="Следующая неделя"
+        title="Следующая неделя"
       />
     </nav>
   );

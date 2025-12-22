@@ -11,7 +11,7 @@ import { ScheduleManagement } from '../../components/admin/ScheduleManagement/Sc
 import { SalesControl } from '../../components/admin/SalesControl/SalesControl';
 
 import { useAccordeon } from '../../hooks/useAccordeon';
-import { CinemaHall, Movie, Screening } from '../../types';
+import { AdminHall, AdminMovie, AdminScreening, CreateMovieDTO } from '../../types/admin';
 
 import './AdminPage.css';
 
@@ -23,9 +23,10 @@ export const AdminPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [halls, setHalls] = useState<CinemaHall[]>([]);
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [screenings, setScreenings] = useState<Screening[]>([]);
+  const [halls, setHalls] = useState<AdminHall[]>([]);
+  const [movies, setMovies] = useState<AdminMovie[]>([]);
+  const [screenings, setScreenings] = useState<AdminScreening[]>([]);
+  const [salesOpen, setSalesOpen] = useState(false); // состояние продаж
 
   const { openSections, toggleSection } = useAccordeon({
     hallManagement: true,
@@ -35,9 +36,7 @@ export const AdminPage: React.FC = () => {
     salesControl: false,
   });
 
-  // -----------------------
   // Проверка авторизации
-  // -----------------------
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -49,40 +48,10 @@ export const AdminPage: React.FC = () => {
         setIsLoading(false);
       }
     };
-
     checkAuth();
   }, []);
 
-  // -----------------------
-  // Login / Logout
-  // -----------------------
-  const handleLogin = async (email: string, password: string) => {
-    try {
-      await axios.get('/sanctum/csrf-cookie');
-      const res = await axios.post('/api/login', { email, password });
-
-      if (res.data?.role === 'admin') {
-        setIsAuthenticated(true);
-        setError('');
-      } else {
-        setError('Неверный логин или пароль');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка авторизации');
-    }
-  };
-
-  const handleLogout = async () => {
-    await axios.post('/api/logout');
-    setIsAuthenticated(false);
-    setHalls([]);
-    setMovies([]);
-    setScreenings([]);
-  };
-
-  // -----------------------
   // Загрузка данных
-  // -----------------------
   const loadHalls = async () => {
     try {
       const res = await axios.get('/api/halls');
@@ -96,7 +65,7 @@ export const AdminPage: React.FC = () => {
   const loadMovies = async () => {
     try {
       const res = await axios.get('/api/movies');
-      setMovies(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+      setMovies(res.data ?? []);
     } catch {
       alert('Не удалось загрузить список фильмов');
       setMovies([]);
@@ -113,31 +82,35 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // -----------------------
-  // Колбэки для HallManagement
-  // -----------------------
-  const handleHallCreated = (hall: CinemaHall) => {
-    setHalls(prev => [...prev, hall]);
+  const loadSalesState = async () => {
+    try {
+      const res = await axios.get('/api/sales');
+      setSalesOpen(res.data.open ?? false);
+    } catch {
+      console.error('Не удалось загрузить состояние продаж');
+      setSalesOpen(false);
+    }
   };
 
-  const handleHallDeleted = (hallId: string) => {
-    setHalls(prev => prev.filter(hall => hall.id !== hallId));
-  };
-
-  // -----------------------
-  // Загрузка данных при логине
-  // -----------------------
+  // Загрузка всех данных при логине
   useEffect(() => {
     if (!isAuthenticated) return;
-
     loadHalls();
     loadMovies();
     loadScreenings();
+    loadSalesState();
   }, [isAuthenticated]);
 
-  // -----------------------
-  // UI состояния
-  // -----------------------
+  // Колбэк для SalesControl
+  const handleSalesToggle = async (open: boolean) => {
+    try {
+      const res = await axios.post('/api/sales', { open });
+      setSalesOpen(res.data.open ?? false);
+    } catch (err) {
+      alert('Ошибка при изменении состояния продаж');
+    }
+  };
+
   if (isLoading) {
     return (
       <AdminLayout>
@@ -150,22 +123,37 @@ export const AdminPage: React.FC = () => {
     return (
       <AdminLayout>
         <AdminHeader />
-        <LoginForm onLogin={handleLogin} error={error} />
+        <LoginForm onLogin={async (email, password) => {
+          try {
+            await axios.get('/sanctum/csrf-cookie');
+            const res = await axios.post('/api/login', { email, password });
+            if (res.data?.role === 'admin') setIsAuthenticated(true);
+            else setError('Неверный логин или пароль');
+          } catch (err: any) {
+            setError(err.response?.data?.message || 'Ошибка авторизации');
+          }
+        }} error={error} />
       </AdminLayout>
-    )
+    );
   }
 
   return (
     <AdminLayout>
-      <AdminHeader onLogout={handleLogout} />
+      <AdminHeader onLogout={async () => {
+        await axios.post('/api/logout');
+        setIsAuthenticated(false);
+        setHalls([]);
+        setMovies([]);
+        setScreenings([]);
+      }} />
 
       <main className="conf-steps">
         <HallManagement
           isOpen={openSections.hallManagement}
           onToggle={() => toggleSection('hallManagement')}
           halls={halls}
-          onHallCreated={handleHallCreated}
-          onHallDeleted={handleHallDeleted}
+          onHallCreated={hall => setHalls(prev => [...prev, hall])}
+          onHallDeleted={id => setHalls(prev => prev.filter(h => h.id !== id))}
         />
 
         <HallConfiguration
@@ -188,16 +176,15 @@ export const AdminPage: React.FC = () => {
           halls={halls}
           movies={movies}
           screenings={screenings}
-          onMovieAdded={loadMovies}
-          onMovieDeleted={loadMovies}
-          onScreeningAdded={loadScreenings}
-          onScreeningDeleted={loadScreenings}
+          onScreeningCreated={async screening => setScreenings(prev => [...prev, screening])}
+          onMovieDeleted={async id => setMovies(prev => prev.filter(m => m.id !== id))}
+          onScreeningDeleted={async id => setScreenings(prev => prev.filter(s => s.id !== id))}
         />
 
         <SalesControl
           isOpen={openSections.salesControl}
           onToggle={() => toggleSection('salesControl')}
-          onSalesToggle={open => alert(`Продажи ${open ? 'открыты' : 'приостановлены'}`)}
+          onSalesToggle={handleSalesToggle}
         />
       </main>
     </AdminLayout>

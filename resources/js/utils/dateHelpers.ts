@@ -1,9 +1,5 @@
 export const DAYS_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-/**
- * Возвращает понедельник той недели, к которой относится указанная дата.
- * Корректно работает при переходах месяца, года и DST.
- */
 export const getMondayOfWeek = (date: Date): Date => {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay();
@@ -16,9 +12,6 @@ export const getMondayOfWeek = (date: Date): Date => {
   );
 };
 
-/**
- * Генерирует массив из 7 дней недели, начиная с понедельника.
- */
 export const generateWeekDays = (selectedDate: Date) => {
   const monday = getMondayOfWeek(selectedDate);
 
@@ -38,7 +31,7 @@ export const generateWeekDays = (selectedDate: Date) => {
     return {
       date: d,
       day: DAYS_SHORT[dayOfWeek],
-      number: String(d.getDate()),
+      number: d.getDate(),
       today: d.toDateString() === todayKey,
       chosen: d.toDateString() === selectedKey,
       weekend: dayOfWeek === 0 || dayOfWeek === 6,

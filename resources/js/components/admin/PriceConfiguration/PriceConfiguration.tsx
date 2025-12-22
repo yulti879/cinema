@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { CinemaHall, PriceData } from '../../../types';
+import { AdminHall, PriceData } from '../../../types/admin';
 import { ConfigSection } from '../ConfigSection/ConfigSection';
 import { ConfigButton } from '../ConfigButton/ConfigButton';
 import { FormField } from '../FormField/FormField';
@@ -10,7 +10,7 @@ import './PriceConfiguration.css';
 interface PriceConfigurationProps {
   isOpen: boolean;
   onToggle: () => void;
-  halls: CinemaHall[];
+  halls: AdminHall[];
   onPricesSaved: (prices: PriceData) => void;
 }
 

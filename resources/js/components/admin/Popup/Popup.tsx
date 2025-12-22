@@ -1,29 +1,33 @@
+// resources/js/components/admin/Popup/Popup.tsx
 import React, { useEffect, useState } from 'react';
 import './Popup.css';
 
 interface PopupProps {
   title?: string;
   children: React.ReactNode;
-  isOpen?: boolean;
-  onClose: () => void;
+  isOpen?: boolean;      // camelCase для React
+  onClose: () => void;   // camelCase для React
 }
 
-export const Popup: React.FC<PopupProps> = ({ isOpen = false, onClose, title, children }) => {
+export const Popup: React.FC<PopupProps> = ({ 
+  isOpen = false, 
+  onClose, 
+  title, 
+  children 
+}) => {
   const [isActive, setIsActive] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Монтирование / размонтирование с анимацией
+  // Анимация открытия/закрытия
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      // Небольшая задержка для активации CSS-анимации
       const timer = setTimeout(() => setIsActive(true), 10);
-      // Блокировка скролла
       document.body.style.overflow = 'hidden';
       return () => clearTimeout(timer);
     } else {
       setIsActive(false);
-      const timer = setTimeout(() => setIsVisible(false), 500); // совпадает с длительностью CSS-анимации
+      const timer = setTimeout(() => setIsVisible(false), 500);
       document.body.style.overflow = '';
       return () => clearTimeout(timer);
     }
@@ -67,7 +71,7 @@ export const Popup: React.FC<PopupProps> = ({ isOpen = false, onClose, title, ch
                 href="#"
                 onClick={handleClose}
               >
-                <img src="/images/admin/close.png" alt="Закрыть" />
+                <img src="/storage/admin/close.png" alt="Закрыть" />
               </a>
             </h2>
           </div>

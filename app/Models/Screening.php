@@ -8,7 +8,7 @@ class Screening extends Model
 {
     protected $fillable = [
         'movie_id',
-        'cinema_hall_id',
+        'hall_id',
         'date',
         'start_time',
         'duration',
@@ -35,6 +35,6 @@ class Screening extends Model
      */
     public function hall()
     {
-        return $this->belongsTo(Hall::class, 'cinema_hall_id');
+        return $this->belongsTo(Hall::class, 'hall_id');
     }
 }

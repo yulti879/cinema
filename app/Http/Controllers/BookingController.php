@@ -16,7 +16,7 @@ class BookingController extends Controller
             'seats'        => 'required|array|min:1',
         ]);
 
-        $screening = Screening::with('hall')->findOrFail($data['screening_id']);
+        $screening = Screening::with('hall')->findOrFail($data['screeningId']);
 
         // Проверка занятости мест
         $bookedSeats = $screening->booked_seats ?? [];

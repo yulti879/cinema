@@ -8,79 +8,106 @@ use Illuminate\Http\Request;
 
 class HallController extends Controller
 {
-    /**
-     * Список залов
-     */
+    // Список всех залов
     public function index()
     {
-        return HallResource::collection(
-            Hall::orderBy('name')->get()
-        );
+        $halls = Hall::orderBy('name')->get();
+        return HallResource::collection($halls);
     }
 
-    /**
-     * Создание зала (админ)
-     */
-    public function store(Request $request)
+    // Показать конкретный зал
+    public function show($id)
     {
-        $data = $request->validate([
-            'name'          => ['required', 'string', 'max:255', 'unique:halls,name'],
-            'rows'          => ['required', 'integer', 'min:1'],
-            'seatsPerRow'   => ['required', 'integer', 'min:1'],
-            'standardPrice' => ['required', 'integer', 'min:0'],
-            'vipPrice'      => ['required', 'integer', 'min:0'],
-            'layout'        => ['nullable', 'array'],
-        ]);
-
-        $hall = Hall::create([
-            'name'           => $data['name'],
-            'rows'           => $data['rows'],
-            'seats_per_row'  => $data['seatsPerRow'],
-            'standard_price' => $data['standardPrice'],
-            'vip_price'      => $data['vipPrice'],
-            'layout'         => $data['layout'] ?? null,
-        ]);
-
+        $hall = Hall::findOrFail($id);
         return new HallResource($hall);
     }
 
-    /**
-     * Обновление зала
-     */
+    // Создание нового зала
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:halls,name'],
+            'rows' => ['required', 'integer', 'min:1', 'max:20'],
+            'seats_per_row' => ['required', 'integer', 'min:1', 'max:20'],
+            'standard_price' => ['nullable', 'integer', 'min:0'],
+            'vip_price' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $hall = Hall::create([
+            'name' => $data['name'],
+            'rows' => $data['rows'],
+            'seats_per_row' => $data['seats_per_row'],
+            'standard_price' => $data['standard_price'] ?? 0,
+            'vip_price' => $data['vip_price'] ?? 0,
+            'layout' => $this->generateDefaultLayout($data['rows'], $data['seats_per_row']),
+        ]);
+
+        return response()->json([
+            'message' => 'Зал успешно создан',
+            'data' => new HallResource($hall)
+        ], 201);
+    }
+
+    // Обновление зала
     public function update(Request $request, $id)
     {
         $hall = Hall::findOrFail($id);
 
         $data = $request->validate([
-            'name'          => ['sometimes', 'string', 'max:255', "unique:halls,name,{$hall->id}"],
-            'rows'          => ['sometimes', 'integer', 'min:1'],
-            'seatsPerRow'   => ['sometimes', 'integer', 'min:1'],
-            'standardPrice' => ['sometimes', 'integer', 'min:0'],
-            'vipPrice'      => ['sometimes', 'integer', 'min:0'],
-            'layout'        => ['nullable', 'array'],
+            'name' => ['sometimes', 'string', 'max:255', "unique:halls,name,{$id}"],
+            'rows' => ['sometimes', 'integer', 'min:1', 'max:20'],
+            'seats_per_row' => ['sometimes', 'integer', 'min:1', 'max:20'],
+            'layout' => ['nullable', 'array'],
         ]);
 
         $hall->update([
-            'name'           => $data['name'] ?? $hall->name,
-            'rows'           => $data['rows'] ?? $hall->rows,
-            'seats_per_row'  => $data['seatsPerRow'] ?? $hall->seats_per_row,
-            'standard_price' => $data['standardPrice'] ?? $hall->standard_price,
-            'vip_price'      => $data['vipPrice'] ?? $hall->vip_price,
-            'layout'         => $data['layout'] ?? $hall->layout,
+            'name' => $data['name'] ?? $hall->name,
+            'rows' => $data['rows'] ?? $hall->rows,
+            'seats_per_row' => $data['seats_per_row'] ?? $hall->seats_per_row,
+            'layout' => $data['layout'] ?? $hall->layout,
         ]);
-
-        return new HallResource($hall);
-    }
-
-    /**
-     * Удаление зала
-     */
-    public function destroy($id)
-    {
-        Hall::findOrFail($id)->delete();
 
         return response()->json([
-            'message' => 'Hall deleted',
+            'message' => 'Зал успешно обновлен',
+            'data' => new HallResource($hall)
         ]);
+    }
+
+    // Удаление зала
+    public function destroy($id)
+    {
+        $hall = Hall::findOrFail($id);
+
+        if ($hall->screenings()->exists()) {
+            return response()->json([
+                'error' => 'Невозможно удалить зал. Есть связанные сеансы.'
+            ], 409);
+        }
+
+        $hall->delete();
+
+        return response()->json([
+            'message' => 'Зал успешно удален'
+        ]);
+    }
+
+    // Генерация схемы по умолчанию - все места обычные
+    private function generateDefaultLayout(int $rows, int $seatsPerRow): array
+    {
+        $layout = [];
+
+        for ($row = 1; $row <= $rows; $row++) {
+            $rowSeats = [];
+            for ($seat = 1; $seat <= $seatsPerRow; $seat++) {
+                $rowSeats[] = [
+                    'row' => $row,
+                    'seat' => $seat,
+                    'type' => 'standard', // 'standard', 'vip', 'disabled'
+                ];
+            }
+            $layout[] = $rowSeats;
+        }
+
+        return $layout;
     }
 }

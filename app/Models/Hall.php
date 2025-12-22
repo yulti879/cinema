@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Hall extends Model
 {
@@ -11,7 +12,7 @@ class Hall extends Model
         'rows',
         'seats_per_row',
         'standard_price',
-        'vip_price',
+        'vip_price', 
         'layout',
     ];
 
@@ -19,11 +20,13 @@ class Hall extends Model
         'layout' => 'array',
     ];
 
-    /**
-     * Получаем все сеансы, связанные с залом.
-     */
-    public function screenings()
+    public function screenings(): HasMany
     {
-        return $this->hasMany(Screening::class, 'cinema_hall_id');
+        return $this->hasMany(Screening::class, 'hall_id');
+    }
+
+    public function canBeDeleted(): bool
+    {
+        return !$this->screenings()->exists();
     }
 }

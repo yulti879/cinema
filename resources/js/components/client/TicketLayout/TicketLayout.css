@@ -17,7 +17,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background-image: url(../images/client/border-top.png);
+  background-image: url(storage/client/border-top.png);
   background-size: 10px 3px;
 }
 .ticket__check::after {
@@ -28,7 +28,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background-image: url(../images/client/border-bottom.png);
+  background-image: url(storage/client/border-bottom.png);
   background-size: 10px 3px;
 }
 
@@ -46,7 +46,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background-image: url(../images/client/border-top.png);
+  background-image: url(storage/client/border-top.png);
   background-size: 10px 3px;
 }
 .ticket__info-wrapper::after {
@@ -57,7 +57,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background-image: url(../images/client/border-bottom.png);
+  background-image: url(storage/client/border-bottom.png);
   background-size: 10px 3px;
 }
 

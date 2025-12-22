@@ -1,17 +1,13 @@
 import { useCinema } from '../../../context/CinemaContext';
 import { MovieCard } from '../MovieCard/MovieCard';
+import './MovieList.css';
 
 export const MovieList: React.FC = () => {
   const { movies, selectedDate, loading, error } = useCinema();
 
-  // Фильтруем фильмы, у которых есть сеансы на выбранную дату
-  const moviesWithScreenings = movies.filter(movie =>
-    movie.halls.some(hall => hall.times.length > 0)
-  );
-
   if (loading) {
     return (
-      <div className="loading-message">
+      <div className="movie-list-loading">
         <div className="loading-spinner"></div>
         <p>Загрузка расписания...</p>
       </div>
@@ -20,7 +16,7 @@ export const MovieList: React.FC = () => {
 
   if (error) {
     return (
-      <div className="error-message">
+      <div className="movie-list-error">
         <h3>Не удалось загрузить фильмы</h3>
         <p>{error}</p>
         <button
@@ -33,21 +29,30 @@ export const MovieList: React.FC = () => {
     );
   }
 
+  if (movies.length === 0) {
+    const formattedDate = selectedDate.toLocaleDateString('ru-RU', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    
+    return (
+      <div className="movie-list-empty">
+        <h3>На {formattedDate} сеансов нет</h3>
+        <p>Выберите другую дату или проверьте расписание позже</p>
+      </div>
+    );
+  }
+
   return (
-    <main>
-      {moviesWithScreenings.map(movie => (
+    <main className="movie-list">
+      {movies.map(movie => (
         <MovieCard
           key={movie.id}
-          movie={movie}          
+          movie={movie}
         />
       ))}
-
-      {moviesWithScreenings.length === 0 && !loading && (
-        <div className="no-movies-message">
-          <h3>На {selectedDate.toLocaleDateString('ru-RU')} сеансов нет</h3>
-          <p>Выберите другую дату или проверьте расписание позже</p>
-        </div>
-      )}
     </main>
   );
 };

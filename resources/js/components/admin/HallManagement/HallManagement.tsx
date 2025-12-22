@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { CinemaHall } from '../../../types';
+import { AdminHall } from '../../../types/admin';
 import { ConfigSection } from '../ConfigSection/ConfigSection';
 import { ConfigButton } from '../ConfigButton/ConfigButton';
 import { Popup } from '../Popup/Popup';
 import { DeleteForm } from '../DeleteForm/DeleteForm';
-import './HallManagement.css';
 
 interface HallManagementProps {
   isOpen: boolean;
   onToggle: () => void;
-  halls: CinemaHall[];
-  onHallCreated: (hall: CinemaHall) => void;
+  halls: AdminHall[];
+  onHallCreated: (hall: AdminHall) => void;
   onHallDeleted: (hallId: string) => void;
 }
 
@@ -25,68 +24,93 @@ export const HallManagement: React.FC<HallManagementProps> = ({
   const [isAddHallPopupOpen, setIsAddHallPopupOpen] = useState(false);
   const [newHallName, setNewHallName] = useState('');
   const [isDeletePopupOpen, setIsDeletePopupOpen] = useState(false);
-  const [hallToDelete, setHallToDelete] = useState<CinemaHall | null>(null);
+  const [hallToDelete, setHallToDelete] = useState<AdminHall | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ----------------------------------
   // Добавление зала
-  // ----------------------------------
   const handleAddHall = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const name = newHallName.trim();
+
+    // Валидация
     if (!name) {
-      alert('Название зала не может быть пустым');
+      alert('Пожалуйста, введите название зала');
       return;
     }
+
     if (name.length < 2) {
       alert('Название зала должно быть минимум 2 символа');
       return;
     }
 
+    // Проверяем, нет ли уже зала с таким названием
+    const existingHall = halls.find(h =>
+      h.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (existingHall) {
+      alert(`Зал с названием "${name}" уже существует`);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await axios.post('/api/halls', {
-        name,
-        rows: 10,
-        seatsPerRow: 8,
-        standardPrice: 300,
-        vipPrice: 500,
-        layout: null,
+      // Отправляем данные на сервер
+      const response = await axios.post('/api/halls', {
+        name: name,
+        rows: 10,          // Дефолтное количество рядов
+        seats_per_row: 8,  // Дефолтное количество мест в ряду
+        standard_price: 0, // Цена по умолчанию для обычных мест
+        vip_price: 0,      // Цена по умолчанию для VIP мест
+        layout: null,      // Пустая схема (сгенерируется на бэкенде)
       });
-      
-      const newHall: CinemaHall = res.data.data;
-      onHallCreated(newHall);
 
-      setIsAddHallPopupOpen(false);
-      setNewHallName('');
-    } catch (err: any) {
-      console.error('Create hall error:', err.response?.data);
+      // Проверяем успешный ответ
+      if (response.data && response.data.data) {
+        const newHall = response.data.data;
 
-      if (err.response?.data?.errors) {
-        const firstError = Object.values(err.response.data.errors)[0] as string[];
-        alert(firstError[0]);
+        // Уведомляем родительский компонент
+        onHallCreated(newHall);
+
+        // Закрываем попап и сбрасываем форму
+        setIsAddHallPopupOpen(false);
+        setNewHallName('');        
       } else {
-        alert('Не удалось создать зал');
+        throw new Error('Сервер вернул некорректные данные');
+      }
+
+    } catch (err: any) {
+      console.error('Ошибка при создании зала:', err);
+
+      // Детализированная обработка ошибок
+      if (err.response) {
+        // Ошибка от сервера
+        const serverError = err.response.data;
+
+        if (serverError.errors) {
+          // Laravel валидационные ошибки
+          const firstError = Object.values(serverError.errors)[0];
+          alert(Array.isArray(firstError) ? firstError[0] : firstError);
+        } else if (serverError.message) {
+          // Сообщение об ошибке
+          alert(serverError.message);
+        } else {
+          alert('Ошибка сервера при создании зала');
+        }
+      } else if (err.request) {
+        // Нет ответа от сервера
+        alert('Не удалось соединиться с сервером. Проверьте подключение.');
+      } else {
+        // Другая ошибка
+        alert(err.message || 'Неизвестная ошибка при создании зала');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const cancelAddHall = () => {
-    setIsAddHallPopupOpen(false);
-    setNewHallName('');
-  };
-
-  // ----------------------------------
   // Удаление зала
-  // ----------------------------------
-  const handleDeleteClick = (hall: CinemaHall) => {
-    setHallToDelete(hall);
-    setIsDeletePopupOpen(true);
-  };
-
   const confirmDelete = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hallToDelete) return;
@@ -97,16 +121,12 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       onHallDeleted(hallToDelete.id);
       setIsDeletePopupOpen(false);
       setHallToDelete(null);
-    } catch (err) {
-      alert('Не удалось удалить зал. Попробуйте ещё раз.');
+    } catch (err: any) {
+      const error = err.response?.data?.error || 'Не удалось удалить зал';
+      alert(error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const cancelDelete = () => {
-    setIsDeletePopupOpen(false);
-    setHallToDelete(null);
   };
 
   return (
@@ -119,25 +139,23 @@ export const HallManagement: React.FC<HallManagementProps> = ({
               <ConfigButton
                 variant="trash"
                 title="Удалить зал"
-                onClick={() => handleDeleteClick(hall)}
-                disabled={isLoading}
+                onClick={() => {
+                  setHallToDelete(hall);
+                  setIsDeletePopupOpen(true);
+                }}
               />
             </li>
           ))}
         </ul>
       ) : (
-        <p
-          className="conf-step__paragraph"
-          style={{ color: '#848484', fontStyle: 'italic' }}
-        >
-          Пока нет созданных залов. Нажмите «Создать зал», чтобы добавить первый зал.
+        <p className="conf-step__paragraph" style={{ color: '#848484' }}>
+          Нет созданных залов
         </p>
       )}
 
       <ConfigButton
         variant="accent"
         onClick={() => setIsAddHallPopupOpen(true)}
-        disabled={isLoading}
       >
         Создать зал
       </ConfigButton>
@@ -145,7 +163,10 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       {/* Попап добавления */}
       <Popup
         isOpen={isAddHallPopupOpen}
-        onClose={cancelAddHall}
+        onClose={() => {
+          setIsAddHallPopupOpen(false);
+          setNewHallName('');
+        }}
         title="Добавление зала"
       >
         <form onSubmit={handleAddHall}>
@@ -159,24 +180,20 @@ export const HallManagement: React.FC<HallManagementProps> = ({
               onChange={e => setNewHallName(e.target.value)}
               required
               autoFocus
-              disabled={isLoading}
             />
           </label>
 
           <div className="conf-step__buttons text-center">
-            <ConfigButton
-              variant="accent"
-              type="submit"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Создание…' : 'Добавить зал'}
+            <ConfigButton variant="accent" type="submit">
+              Добавить зал
             </ConfigButton>
-
             <ConfigButton
               variant="regular"
               type="button"
-              onClick={cancelAddHall}
-              disabled={isLoading}
+              onClick={() => {
+                setIsAddHallPopupOpen(false);
+                setNewHallName('');
+              }}
             >
               Отменить
             </ConfigButton>
@@ -187,17 +204,22 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       {/* Попап удаления */}
       <Popup
         isOpen={isDeletePopupOpen}
-        onClose={cancelDelete}
+        onClose={() => {
+          setIsDeletePopupOpen(false);
+          setHallToDelete(null);
+        }}
         title="Удаление зала"
       >
         <DeleteForm
           message="Вы действительно хотите удалить зал"
           itemName={hallToDelete?.name || ''}
           onSubmit={confirmDelete}
-          onCancel={cancelDelete}
-          submitText={isLoading ? 'Удаляем…' : 'Удалить'}
+          onCancel={() => {
+            setIsDeletePopupOpen(false);
+            setHallToDelete(null);
+          }}
         />
-      </Popup>      
+      </Popup>
     </ConfigSection>
   );
 };

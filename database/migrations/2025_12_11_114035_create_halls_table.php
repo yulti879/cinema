@@ -13,8 +13,8 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->integer('rows');
             $table->integer('seats_per_row');
-            $table->integer('standard_price');
-            $table->integer('vip_price');
+            $table->decimal('standard_price', 8, 2)->default(0);
+            $table->decimal('vip_price', 8, 2)->default(0);
             $table->json('layout')->nullable();
             $table->timestamps();
         });

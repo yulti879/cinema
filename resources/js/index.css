@@ -20,13 +20,13 @@ body {
 
 /* Стили для клиентской части */
 body.client-body {
-  background-image: url("/images/client/background.png");
+  background-image: url("/storage/client/background.png");
   background-position: right;
 }
 
 /* Стили для админской части */
 body.admin-body {
-  background-image: url("/images/admin/background.png");
+  background-image: url("/storage/admin/background.png");
   background-color: rgba(0, 0, 0, 0.5);
   background-blend-mode: multiply;
   counter-reset: num;

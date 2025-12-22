@@ -1,104 +1,126 @@
-// Типы мест
-export type SeatType = 'standard' | 'vip' | 'disabled' | 'taken';
+// ========== БАЗОВЫЕ ТИПЫ ==========
 
-export interface Seat {
-  type: SeatType;
-  row: number;
-  number: number;
-  price?: number;
+export type SeatType = 'standard' | 'vip' | 'taken' | 'selected';
+
+// ========== ОСНОВНЫЕ СУЩНОСТИ ==========
+
+export interface Booking {
+  id: string;
+  screeningId: string;
+  code: string;                 // Уникальный код брони
+  customerEmail?: string;
+  seats: Seat[];                // Выбранные места
+  totalPrice: number;
+  expiresAt: string;           // Время истечения брони???????
+  isConfirmed: boolean;
+  createdAt: string;
 }
 
-// Навигация
-export interface Day {
-  date: Date;
-  day: string;
-  number: string;
-  today: boolean;
-  chosen: boolean;
-  weekend: boolean;
-  next?: boolean;
-  prev?: boolean;
-}
-
-// Адаптированные для клиента интерфейсы
-export interface ClientHall {
+export interface Hall {
   id: string;
   name: string;
-  times: string[];
-  screeningIds: string[];
-  seats?: Seat[][];
+  rows: number;
+  seatsPerRow: number;
+  layout: Seat[][];
+  totalSeats: number;
 }
+
+export interface Movie {
+  id: string;
+  title: string;
+  posterUrl?: string;
+  synopsis: string;
+  duration: number;      // в минутах
+  origin: string;
+}
+
+export interface Screening {
+  id: string;
+  movieId: string;
+  hallId: string;
+  date: string;         // "YYYY-MM-DD"
+  startTime: string;   // "HH:MM"
+  bookedSeats?: string[]; // ["1-1", "1-2"]
+  movie?: Movie;
+  hall?: Hall;
+}
+
+export interface ApiMovie {
+  id: number;
+  title: string;
+  posterUrl?: string;
+  synopsis: string;
+  duration: number;
+  origin: string;
+}
+
+export interface ApiScreening {
+  id: number;
+  movieId: number;
+  hallId: number;
+  date: string;
+  startTime: string;
+  hall?: {
+    id: number;
+    name: string;
+  };
+}
+
+// ========== ТИПЫ ДЛЯ КОМПОНЕНТОВ ==========
 
 export interface ClientMovie {
   id: string;
   title: string;
-  poster: string;
+  posterUrl?: string;
   synopsis: string;
-  duration: string;
+  duration: number;
   origin: string;
-  halls: ClientHall[];
+  halls: HallSchedule[];
 }
 
-// Бронирование и билеты
-export interface BookingData {
+export interface Day {
+  date: Date;
+  day: string;
+  number: number;
+  today: boolean;
+  chosen: boolean;
+  weekend: boolean;
+}
+
+export interface HallSchedule {
   id: string;
+  name: string;
+  times: string[];          // ["10:20", "14:10"]
+  screeningIds: string[];
+}
+
+export interface Seat {
+  type: SeatType;
+  row: number;
+  seat: number;
+  price?: number;
+}
+
+// ========== ТИПЫ ДЛЯ СТРАНИЦ ==========
+
+export interface PaymentData {
+  screeningId: string;
   movieTitle: string;
   startTime: string;
+  hallName: string;
   date: string;
-  hallName: string;
-  seats: string[];
-  selectedSeats: string[];
-  totalPrice: number;
-  bookingTime: string;
+  seats: Seat[];
+  totalSeats: number;
+  totalPrice?: number;
+}
+
+export interface TicketData {
   bookingCode: string;
-  qrCodeUrl?: string;
-}
-
-
-export interface Ticket {
-  id: string;
   movieTitle: string;
+  startTime: string;
   hallName: string;
-  startTime: string;
-  date: string; // ← ДОБАВИТЬ
-  seats: string[];
+  date: string;
+  seats: string[]; // ["Ряд 1, Место 3", "Ряд 1, Место 4"]
   totalPrice: number;
-  qrCode?: string;
   qrCodeUrl?: string;
-  bookingTime: string;
-  bookingCode: string;
-  bookingId?: string;
-  expiresAt?: string;
-  status?: 'active' | 'used' | 'cancelled';
-}
-
-// Контекст и пропсы
-export interface CinemaState {
-  selectedDate: Date;
-  movies: ClientMovie[];
-  setSelectedDate: (date: Date) => void;
-  setMovies: (movies: ClientMovie[]) => void;
-}
-
-export interface MovieCardProps {
-  movie: ClientMovie;
-}
-
-export interface HallScheduleProps {
-  hall: ClientHall;
-  movieTitle: string;
-}
-
-export interface TicketLayoutProps {
-  type: 'payment' | 'ticket';
-  movieTitle: string;
-  seats: string;
-  hall: string;
-  startTime: string;
-  cost?: number;
-  qrCode?: string;
-  qrCodeUrl?: string;
-  bookingCode?: string;
-  onGetTicket?: () => void;
-  isButtonDisabled?: boolean;
 }

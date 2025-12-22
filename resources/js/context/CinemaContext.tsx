@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { ClientMovie, ClientHall } from '../types/client';
+import type { ClientMovie, HallSchedule } from '../types/client';
+import type { ApiMovie, ApiScreening } from '../types/client'; // новые интерфейсы
 
 interface CinemaContextType {
   movies: ClientMovie[];
@@ -13,97 +14,138 @@ const CinemaContext = createContext<CinemaContextType | null>(null);
 
 export const CinemaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [movies, setMovies] = useState<ClientMovie[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadData() {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const [moviesRes, hallsRes, screeningsRes] = await Promise.all([
-        fetch('/api/movies'),
-        fetch('/api/halls'),
-        fetch('/api/screenings'),
-      ]);
+        // Форматируем выбранную дату в YYYY-MM-DD
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
 
-      if (!moviesRes.ok || !hallsRes.ok || !screeningsRes.ok) {
-        throw new Error('Ошибка загрузки API');
-      }
+        // Запрос к API
+        const [moviesRes, screeningsRes] = await Promise.all([
+          fetch('/api/movies'),
+          fetch('/api/screenings'),
+        ]);
 
-      const moviesData = await moviesRes.json();
-      const hallsData = await hallsRes.json();
-      const screeningsData = await screeningsRes.json();
-
-      // Создаем карты фильмов и залов
-      const moviesMap: ClientMovie[] = moviesData.map((m: any) => ({
-        id: m.id.toString(),
-        title: m.title,
-        poster: m.poster_url,
-        synopsis: m.synopsis,
-        duration: m.duration.toString(),
-        origin: m.origin,
-        halls: [],
-      }));
-
-      const hallsMap = new Map<string, ClientHall>(
-        hallsData.map((h: any) => [
-          String(h.id),
-          { id: String(h.id), name: String(h.name) } // теперь TS не ругается
-        ])
-      );
-
-      // Формируем дату для фильтрации сеансов в формате YYYY-MM-DD
-      const dateString = selectedDate.toLocaleDateString('en-CA'); 
-
-      screeningsData.forEach((s: any) => {
-        if (s.date !== dateString) return;
-
-        const movie = moviesMap.find((m) => m.id === String(s.movie_id));
-        if (!movie) return;
-
-        let hall = movie.halls.find((h) => h.id === String(s.cinema_hall_id));
-        if (!hall) {
-          const hallBase = hallsMap.get(String(s.cinema_hall_id));
-          if (!hallBase) return;
-
-          hall = {
-            id: hallBase.id,
-            name: hallBase.name,
-            times: [],
-            screeningIds: [],
-          };
-          movie.halls.push(hall);
+        if (!moviesRes.ok || !screeningsRes.ok) {
+          throw new Error('Ошибка загрузки данных');
         }
 
-        hall.times.push(s.start_time.slice(0, 5));
-        hall.screeningIds.push(String(s.id));
-      });
+        const moviesData: ApiMovie[] = await moviesRes.json();
+        const screeningsData: ApiScreening[] = await screeningsRes.json();
 
-      setMovies(moviesMap);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки');
-      setMovies([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+        // Фильтруем сеансы на выбранную дату (YYYY-MM-DD)
+        const screeningsForDate = screeningsData.filter(
+          s => s.date.slice(0, 10) === dateString
+        );
 
-  useEffect(() => {
-    loadData();
+        // Создаём карту фильмов
+        const moviesMap = new Map<string, ClientMovie>();
+        const hallsMap = new Map<string, Map<string, HallSchedule>>();
+
+        moviesData.forEach(movie => {
+          moviesMap.set(movie.id.toString(), {
+            id: movie.id.toString(),
+            title: movie.title,
+            posterUrl: movie.posterUrl,
+            synopsis: movie.synopsis,
+            duration: movie.duration,
+            origin: movie.origin,
+            halls: [],
+          });
+        });
+
+        // Обрабатываем сеансы
+        screeningsForDate.forEach(screening => {
+          const movieId = screening.movieId.toString();
+          const hallId = screening.hallId.toString();
+
+          const movie = moviesMap.get(movieId);
+          if (!movie) return;
+
+          // Карта залов для фильма
+          let movieHalls = hallsMap.get(movieId);
+          if (!movieHalls) {
+            movieHalls = new Map();
+            hallsMap.set(movieId, movieHalls);
+          }
+
+          // Расписание зала
+          let hallSchedule = movieHalls.get(hallId);
+          if (!hallSchedule) {
+            hallSchedule = {
+              id: hallId,
+              name: screening.hall?.name || `Зал ${hallId}`,
+              times: [],
+              screeningIds: [],
+            };
+            movieHalls.set(hallId, hallSchedule);
+          }
+
+          // Обрезаем startTime до HH:MM
+          const startTime = new Date(screening.startTime).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+
+          hallSchedule.times.push(startTime);
+          hallSchedule.screeningIds.push(screening.id.toString());
+        });
+
+        // Формируем ClientMovie[]
+        const resultMovies: ClientMovie[] = Array.from(moviesMap.values())
+          .map(movie => {
+            const movieHalls = hallsMap.get(movie.id);
+            if (movieHalls) {
+              movie.halls = Array.from(movieHalls.values())
+                .map(hall => ({
+                  ...hall,
+                  times: hall.times.sort((a, b) => a.localeCompare(b)),
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            }
+            return movie;
+          })
+          .filter(movie => movie.halls.length > 0);
+
+        setMovies(resultMovies);
+
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Ошибка загрузки расписания';
+        console.error('Error loading cinema data:', err);
+        setError(message);
+        setMovies([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [selectedDate]);
 
+  const contextValue: CinemaContextType = {
+    movies,
+    selectedDate,
+    loading,
+    error,
+    setSelectedDate,
+  };
+
   return (
-    <CinemaContext.Provider
-      value={{
-        movies,
-        selectedDate,
-        loading,
-        error,
-        setSelectedDate,
-      }}
-    >
+    <CinemaContext.Provider value={contextValue}>
       {children}
     </CinemaContext.Provider>
   );
@@ -111,6 +153,6 @@ export const CinemaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 export const useCinema = () => {
   const ctx = useContext(CinemaContext);
-  if (!ctx) throw new Error('CinemaContext must be used inside provider');
+  if (!ctx) throw new Error('useCinema must be used within CinemaProvider');
   return ctx;
 };

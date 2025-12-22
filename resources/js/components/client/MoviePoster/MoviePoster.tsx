@@ -11,7 +11,7 @@ export const MoviePoster: React.FC<MoviePosterProps> = ({
   title, 
   poster 
 }) => {  
-  const { handlePosterError, getPosterSrc } = usePoster('/images/posters/defaultPoster.png');
+  const { handlePosterError, getPosterSrc } = usePoster('/storage/posters/defaultPoster.png');
   
   return (
     <div className="movie__poster">

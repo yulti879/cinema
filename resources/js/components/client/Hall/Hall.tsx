@@ -1,212 +1,202 @@
-// resources/js/components/client/Hall/Hall.tsx
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import type { Seat, SeatType, HallLayoutRow, BookingData } from '../../../types';
-import { useSeatSelection } from '../../../hooks/useSeatSelection';
-import { useSeatCalculations } from '../../../hooks/useSeatCalculations';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import type { Seat, Screening } from '../../../types/client';
+import { convertAdminHallToClient } from '../../../utils/convertTypes';
 import './Hall.css';
 
-interface HallProps {
-  movieTitle?: string;
-  startTime?: string;
-  hallName?: string;
-  screeningId?: string;
-  date?: string;
-}
-
-export const Hall: React.FC<HallProps> = ({
-  movieTitle,
-  startTime,
-  hallName,
-  screeningId: propScreeningId,
-  date
-}) => {
+export const Hall: React.FC = () => {
+  const { screeningId } = useParams<{ screeningId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const [hallLayout, setHallLayout] = useState<HallLayoutRow[] | null>(null);
+  const [hallLayout, setHallLayout] = useState<Seat[][]>([]);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
-  const [seatsLoading, setSeatsLoading] = useState(true);
+  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
+  const [screening, setScreening] = useState<Screening | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
-  const [standardPrice, setStandardPrice] = useState(250);
-  const [vipPrice, setVipPrice] = useState(350);
+  const [error, setError] = useState<string | null>(null);
 
-  const { selectedSeats, handleSeatClick, getSelectedCount, isSeatSelected } = useSeatSelection(6);
-  const { calculateTotalPrice, getSelectedSeatsInfo } = useSeatCalculations();
-
-  const { movieTitle: stateMovieTitle, startTime: stateStartTime, hallName: stateHallName, screeningId: stateScreeningId, date: stateDate } = location.state || {};
-
-  const finalScreeningId = propScreeningId || stateScreeningId;
-  const finalMovieTitle = stateMovieTitle || movieTitle;
-  const finalStartTime = stateStartTime || startTime;
-  const finalHallName = stateHallName || hallName;
-  const finalDate = stateDate || date;
+  // Цены мест
+  const seatPrices = { standard: 250, vip: 350 };
 
   useEffect(() => {
-    if (!finalScreeningId) return;
-    setSeatsLoading(true);
+    const fetchData = async () => {
+      if (!screeningId) {
+        setError('ID сеанса не указан');
+        return;
+      }
 
-    const loadData = async () => {
       try {
-        const res = await fetch(`/api/screenings/${finalScreeningId}`);
-        if (!res.ok) throw new Error('Ошибка загрузки сеанса');
+        setIsLoading(true);
 
-        const screeningData = await res.json();
-        const hall = screeningData.hall;
-        if (!hall || !hall.layout) throw new Error('Схема зала не настроена');
+        // 1. Загружаем сеанс
+        const screeningRes = await fetch(`/api/screenings/${screeningId}`);
+        if (!screeningRes.ok) throw new Error('Сеанс не найден');
 
-        const sPrice = hall.standard_price && hall.standard_price > 0 ? hall.standard_price : 250;
-        const vPrice = hall.vip_price && hall.vip_price > 0 ? hall.vip_price : 350;
-        setStandardPrice(sPrice);
-        setVipPrice(vPrice);
+        const screeningData: Screening = await screeningRes.json();
+        setScreening(screeningData);
+        setBookedSeats(screeningData.bookedSeats || []);
 
-        const layout: HallLayoutRow[] = hall.layout.map((row: any[]) => ({
-          types: row.map((seat: any) => {
-            switch (seat.type) {
-              case 'vip': return 'vip';
-              case 'standard': return 'standard';
-              case 'taken': return 'taken';
-              default: return 'standard';
-            }
-          }) as SeatType[],
-          prices: row.map((seat: any) => (seat.price && seat.price > 0 ? seat.price : seat.type === 'vip' ? vPrice : sPrice))
-        }));
+        // 2. Загружаем зал
+        const hallRes = await fetch(`/api/halls/${screeningData.hallId}`);
+        if (!hallRes.ok) throw new Error('Зал не найден');
 
-        setHallLayout(layout);
-        setBookedSeats(screeningData.booked_seats || []);
+        const adminHall = await hallRes.json();
+
+        // 3. Конвертируем зал в клиентский формат
+        const clientHall = convertAdminHallToClient(
+          adminHall,
+          screeningData.bookedSeats || []
+        );
+
+        setHallLayout(clientHall.layout);
       } catch (err) {
-        console.error(err);
-        alert('Ошибка загрузки данных зала или сеанса');
-        setHallLayout(null);
-        setBookedSeats([]);
+        setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
       } finally {
-        setSeatsLoading(false);
+        setIsLoading(false);
       }
     };
 
-    loadData();
-  }, [finalScreeningId]);
+    fetchData();
+  }, [screeningId]);
 
-  const handleSchemeDoubleClick = () => setIsZoomed(prev => !prev);
+  // Клик по месту
+  const handleSeatClick = (rowIndex: number, seatIndex: number, seatType: Seat['type']) => {
+    if (seatType === 'taken') return;
 
-  const getSeatType = (rowIndex: number, seatIndex: number, baseType: SeatType): SeatType => {
-    const seatId = `${rowIndex + 1}-${seatIndex + 1}`;
-    return bookedSeats.includes(seatId) ? 'taken' : baseType;
+    const seat: Seat = {
+      type: seatType,
+      row: rowIndex + 1,
+      seat: seatIndex + 1
+    };
+
+    const seatId = `${seat.row}-${seat.seat}`;
+    const isAlreadySelected = selectedSeats.some(s => `${s.row}-${s.seat}` === seatId);
+
+    if (isAlreadySelected) {
+      setSelectedSeats(prev => prev.filter(s => `${s.row}-${s.seat}` !== seatId));
+    } else {
+      if (selectedSeats.length >= 6) {
+        alert('Можно выбрать не более 6 мест');
+        return;
+      }
+      setSelectedSeats(prev => [...prev, seat]);
+    }
   };
 
-  const seats: Seat[][] = useMemo(() => {
-    if (!hallLayout) return [];
+  const getSeatDisplayType = (rowIndex: number, seatIndex: number, baseType: Seat['type']): Seat['type'] => {
+    const seatId = `${rowIndex + 1}-${seatIndex + 1}`;
+    if (bookedSeats.includes(seatId) || baseType === 'taken') return 'taken';
+    if (selectedSeats.some(s => `${s.row}-${s.seat}` === seatId)) return 'selected';
+    return baseType;
+  };
 
-    return hallLayout.map((row, rowIndex) =>
-      row.types.map((type, seatIndex) => {
-        const seatType = getSeatType(rowIndex, seatIndex, type);
-        const price = seatType === 'taken' || seatType === 'disabled' ? 0 : row.prices[seatIndex];
-        return { type: seatType, row: rowIndex + 1, number: seatIndex + 1, price };
-      })
-    );
-  }, [hallLayout, bookedSeats]);
-
-  const handleBooking = async () => {
-    if (!finalScreeningId || selectedSeats.length === 0 || !hallLayout) {
-      alert('Ошибка: выберите место и убедитесь, что схема загружена');
+  const handleBooking = () => {
+    if (!screening) {
+      alert('Данные сеанса не загружены');
+      return;
+    }
+    if (selectedSeats.length === 0) {
+      alert('Выберите хотя бы одно место');
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const totalPrice = calculateTotalPrice(seats, selectedSeats);
-
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          screening_id: Number(finalScreeningId),
-          seats: selectedSeats,
-          total_price: totalPrice,
-        })
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Ошибка сервера: ${errorText}`);
+    navigate('/payment', {
+      state: {
+        screeningId,
+        movieTitle: screening.movie?.title || 'Фильм',
+        startTime: screening.startTime,
+        hallName: screening.hall?.name || 'Зал',
+        date: screening.date,
+        seats: selectedSeats,
+        totalSeats: selectedSeats.length
       }
-
-      const booking: BookingData = await res.json();
-
-      navigate('/payment', { state: booking });
-    } catch (err: any) {
-      console.error('Ошибка бронирования:', err);
-      alert(`Ошибка бронирования: ${err.message}`);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
+
+  if (error) {
+    return (
+      <main>
+        <section className="buying">
+          <div className="error-message">{error}</div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoading || !screening) {
+    return (
+      <main>
+        <section className="buying">
+          <div className="loading">Загрузка...</div>
+        </section>
+      </main>
+    );
+  }
+
+  // Форматируем начало сеанса в HH:MM
+  const startTime = new Date(screening.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <main>
       <section className="buying">
         <div className="buying__info">
           <div className="buying__info-description">
-            <h2 className="buying__info-title">{finalMovieTitle}</h2>
-            <p className="buying__info-start">Начало сеанса: {finalStartTime}</p>
-            <p className="buying__info-hall">{finalHallName}</p>
+            <h2 className="buying__info-title">{screening.movie?.title || 'Фильм'}</h2>
+            <p className="buying__info-start">Начало сеанса: {startTime}</p>
+            <p className="buying__info-hall">{screening.hall?.name || 'Зал'}</p>
           </div>
           <div className="buying__info-hint">
-            <p>Тапните дважды,<br />чтобы увеличить</p>
+            <p>Тапните дважды,<br/>чтобы увеличить</p>
           </div>
         </div>
 
-        {!seatsLoading && seats.length > 0 && (
-          <div className={`buying-scheme ${isZoomed ? 'buying-scheme--zoomed' : ''}`} onDoubleClick={handleSchemeDoubleClick}>
-            <div className="buying-scheme__wrapper">
-              {seats.map((row, rowIndex) => (
-                <div key={rowIndex} className="buying-scheme__row">
-                  <span className="buying-scheme__row-number">{rowIndex + 1}</span>
-                  {row.map((seat, seatIndex) => {
-                    const selected = isSeatSelected(rowIndex, seatIndex);
-                    return (
-                      <span
-                        key={seatIndex}
-                        className={`buying-scheme__chair buying-scheme__chair_${seat.type} ${selected ? 'buying-scheme__chair_selected' : ''}`}
-                        onClick={() => handleSeatClick(rowIndex, seatIndex, seat.type)}
-                        title={`Ряд ${rowIndex + 1}, Место ${seatIndex + 1} - ${seat.type}`}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+        <div className="buying-scheme">
+          <div className="buying-scheme__wrapper">
+            {hallLayout.map((row, rowIndex) => (
+              <div key={rowIndex} className="buying-scheme__row">
+                {row.map((seat, seatIndex) => {
+                  const displayType = getSeatDisplayType(rowIndex, seatIndex, seat.type);
+                  return (
+                    <span
+                      key={seatIndex}
+                      className={`buying-scheme__chair buying-scheme__chair_${displayType}`}
+                      onClick={() => handleSeatClick(rowIndex, seatIndex, seat.type)}
+                      title={`Ряд ${rowIndex + 1}, Место ${seatIndex + 1}`}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
 
-            <div className="buying-scheme__legend">
-              <div className="col">
-                <p className="buying-scheme__legend-price">
-                  <span className="buying-scheme__chair buying-scheme__chair_standard"></span>
-                  Свободно (<span className="buying-scheme__legend-value">{standardPrice}</span>руб)
-                </p>
-                <p className="buying-scheme__legend-price">
-                  <span className="buying-scheme__chair buying-scheme__chair_vip"></span>
-                  Свободно VIP (<span className="buying-scheme__legend-value">{vipPrice}</span>руб)
-                </p>
-              </div>
-              <div className="col">
-                <p className="buying-scheme__legend-price">
-                  <span className="buying-scheme__chair buying-scheme__chair_taken"></span> Занято
-                </p>
-                <p className="buying-scheme__legend-price">
-                  <span className="buying-scheme__chair buying-scheme__chair_selected"></span> Выбрано
-                </p>
-              </div>
+          <div className="buying-scheme__legend">
+            <div className="col">
+              <p className="buying-scheme__legend-price">
+                <span className="buying-scheme__chair buying-scheme__chair_standard"></span>
+                Свободно (<span className="buying-scheme__legend-value">{seatPrices.standard}</span>руб)
+              </p>
+              <p className="buying-scheme__legend-price">
+                <span className="buying-scheme__chair buying-scheme__chair_vip"></span>
+                Свободно VIP (<span className="buying-scheme__legend-value">{seatPrices.vip}</span>руб)
+              </p>
+            </div>
+            <div className="col">
+              <p className="buying-scheme__legend-price">
+                <span className="buying-scheme__chair buying-scheme__chair_taken"></span> Занято
+              </p>
+              <p className="buying-scheme__legend-price">
+                <span className="buying-scheme__chair buying-scheme__chair_selected"></span> Выбрано
+              </p>
             </div>
           </div>
-        )}
+        </div>
 
-        <button
-          className="acceptin-button"
+        <button 
+          className="accept-button" 
           onClick={handleBooking}
-          disabled={selectedSeats.length === 0 || isLoading || seats.length === 0 || seatsLoading}
+          disabled={selectedSeats.length === 0}
         >
-          {isLoading ? 'Бронируем...' : `Забронировать (${getSelectedCount()})`}
+          {`Забронировать (${selectedSeats.length})`}
         </button>
       </section>
     </main>

@@ -7,26 +7,32 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ScreeningResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
+    public static $wrap = null;
+
     public function toArray(Request $request): array
     {
         return [
-            'id'        => $this->id,
-            'date'      => $this->date,
+            'id' => $this->id,
+            'movieId' => $this->movie_id,
+            'hallId' => $this->hall_id,
+            'date' => $this->date,
             'startTime' => $this->start_time,
+            'bookedSeats' => $this->booked_seats ?? [],
 
-            'movie' => [
-                'id'       => $this->movie->id,
-                'title'    => $this->movie->title,
-                'duration' => $this->movie->duration,
-            ],
+            'movie' => $this->whenLoaded('movie', function () {
+                return [
+                    'id' => $this->movie->id,
+                    'title' => $this->movie->title,
+                    'duration' => $this->movie->duration,
+                ];
+            }),
 
-            'hall' => [
-                'id'   => $this->hall->id,
-                'name' => $this->hall->name,
-            ],
+            'hall' => $this->whenLoaded('hall', function () {
+                return [
+                    'id' => $this->hall->id,
+                    'name' => $this->hall->name,
+                ];
+            }),
         ];
     }
 }

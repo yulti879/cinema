@@ -101,7 +101,7 @@ select {
   right: 42px;
   width: 24px;
   height: 16px;
-  background-image: url("images/admin/switch.png");
+  background-image: url("storage/admin/switch.png");
   background-size: 24px 16px;
 }
 
@@ -284,7 +284,7 @@ select {
   left: 4px;
   width: 12px;
   height: 12px;
-  background-image: url("images/admin/trash-sprite.png");
+  background-image: url("storage/admin/trash-sprite.png");
   background-position: 0 0;
   background-size: 24px 12px;
   background-repeat: no-repeat;
@@ -370,7 +370,7 @@ select {
 .conf-step__chair_vip {
   border-color: #0a828a;
   background-color: #b0d6d8;
-  background-image: url("images/admin/green-pattern.png");
+  background-image: url("storage/admin/green-pattern.png");
   background-repeat: repeat;
 }
 

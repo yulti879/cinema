@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('screenings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('movie_id')->constrained()->onDelete('cascade');
-            $table->foreignId('cinema_hall_id')->constrained('halls')->onDelete('cascade');
+            $table->foreignId('hall_id')->constrained('halls')->onDelete('cascade');
             $table->date('date');
             $table->time('start_time');
             $table->json('booked_seats')->nullable();

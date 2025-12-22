@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-export const usePoster = (defaultPoster: string = '/images/posters/defaultPoster.png') => {
+export const usePoster = (defaultPoster: string = '/storage/posters/defaultPoster.png') => {
 
   const handlePosterError = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {

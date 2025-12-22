@@ -26,21 +26,22 @@ export const SalesControl: React.FC<SalesControlProps> = ({
       try {
         const res = await axios.get('/api/sales');
         setSalesOpen(res.data.open);
+        onSalesToggle(res.data.open); // синхронизация с родителем
       } catch (err) {
         console.error('Ошибка загрузки состояния продаж', err);
         alert('Не удалось загрузить состояние продаж');
       }
     };
     fetchSalesState();
-  }, []);
+  }, [onSalesToggle]);
 
   const handleToggleSales = async () => {
     if (!salesOpen) {
       setIsLoading(true);
       try {
-        await axios.post('/api/sales', { open: true });
-        setSalesOpen(true);
-        onSalesToggle(true);
+        const res = await axios.post('/api/sales', { open: true });
+        setSalesOpen(res.data.open);
+        onSalesToggle(res.data.open); // передаем реальное значение
       } catch (err) {
         alert('Ошибка при открытии продаж');
       } finally {
@@ -55,9 +56,9 @@ export const SalesControl: React.FC<SalesControlProps> = ({
     e.preventDefault();
     setIsLoading(true);
     try {
-      await axios.post('/api/sales', { open: false });
-      setSalesOpen(false);
-      onSalesToggle(false);
+      const res = await axios.post('/api/sales', { open: false });
+      setSalesOpen(res.data.open);
+      onSalesToggle(res.data.open); // передаем реальное значение
     } catch (err) {
       alert('Ошибка при приостановке продаж');
     } finally {

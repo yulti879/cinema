@@ -12,7 +12,7 @@ const router = createBrowserRouter([
     element: <MainPage />,
   },
   {
-    path: "/hall",
+    path: "/hall/:screeningId",
     element: <HallPage />,
   },
   {
@@ -26,7 +26,7 @@ const router = createBrowserRouter([
 {
     path: "/admin",
     element: <AdminPage />,
-  },
+  }, 
   {
     path: "*",
     element: <NotFoundPage />,

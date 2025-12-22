@@ -1,6 +1,7 @@
+// resources\js\components\admin\HallConfiguration\HallConfiguration.tsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { CinemaHall, HallConfigData, Seat } from '../../../types';
+import type { AdminHall, AdminSeat } from '../../../types/admin';
 import { ConfigSection } from '../ConfigSection/ConfigSection';
 import { ConfigButton } from '../ConfigButton/ConfigButton';
 import './HallConfiguration.css';
@@ -8,9 +9,11 @@ import './HallConfiguration.css';
 interface HallConfigurationProps {
   isOpen: boolean;
   onToggle: () => void;
-  halls: CinemaHall[];
-  onConfigurationSaved: (hallConfig: HallConfigData) => void;
+  halls: AdminHall[];
+  onConfigurationSaved: (hallId: string) => void;
 }
+
+type AdminSeatType = 'disabled' | 'standard' | 'vip';
 
 export const HallConfiguration: React.FC<HallConfigurationProps> = ({
   isOpen,
@@ -21,34 +24,34 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
   const [selectedHallId, setSelectedHallId] = useState<string | null>(null);
   const [rows, setRows] = useState<number>(0);
   const [seatsPerRow, setSeatsPerRow] = useState<number>(0);
-  const [layout, setLayout] = useState<Seat[][]>([]);
+  const [layout, setLayout] = useState<AdminSeat[][]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Загружаем конфигурацию выбранного зала
+  // Загружаем конфигурацию при выборе зала
   useEffect(() => {
-    if (!selectedHallId) return;
+    if (!selectedHallId) {
+      setRows(0);
+      setSeatsPerRow(0);
+      setLayout([]);
+      return;
+    }
+    
     const hall = halls.find(h => h.id === selectedHallId);
-    if (!hall) return;
+    if (!hall) {
+      setRows(0);
+      setSeatsPerRow(0);
+      setLayout([]);
+      return;
+    }
 
-    setRows(hall.rows);
-    setSeatsPerRow(hall.seatsPerRow);
-
-    setLayout(
-      hall.layout?.length
-        ? hall.layout
-        : Array.from({ length: hall.rows }, () =>
-            Array.from({ length: hall.seatsPerRow }, (_, i) => ({
-              row: 0,
-              number: i + 1,
-              type: 'standard' as Seat['type'],
-              price: hall.standardPrice || 0,
-            }))
-          )
-    );
+    // Берем значения из БД (если нет - ставим 0)
+    setRows(hall.rows || 0);
+    setSeatsPerRow(hall.seatsPerRow || 0);
+    setLayout(hall.layout || []);
   }, [selectedHallId, halls]);
 
-  // Изменение типа кресла при клике
-  const handleSeatTypeChange = (rowIndex: number, seatIndex: number, type: Seat['type']) => {
+  // Изменение типа кресла
+  const handleSeatTypeChange = (rowIndex: number, seatIndex: number, type: AdminSeatType) => {
     setLayout(prev => {
       const newLayout = prev.map(r => [...r]);
       newLayout[rowIndex][seatIndex].type = type;
@@ -56,34 +59,74 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
     });
   };
 
-  // Цикл типов кресел: standard → vip → disabled → standard
-  const nextType = (current: Seat['type']): Seat['type'] => {
+  // Цикл типов кресел для админки: standard → vip → disabled → standard
+  const nextType = (current: AdminSeatType): AdminSeatType => {
     if (current === 'standard') return 'vip';
     if (current === 'vip') return 'disabled';
     return 'standard';
   };
 
+  // Обработчик клика на кресло
+  const handleSeatClick = (rowIndex: number, seatIndex: number) => {
+    const currentType = layout[rowIndex][seatIndex].type;
+    const newType = nextType(currentType);
+    handleSeatTypeChange(rowIndex, seatIndex, newType);
+  };
+
+  // Создание новой схемы при изменении размеров
+  const updateLayoutSize = () => {
+    // Если хотя бы одно значение 0 - очищаем layout
+    if (rows < 1 || seatsPerRow < 1) {
+      setLayout([]);
+      return;
+    }
+
+    const newLayout: AdminSeat[][] = [];
+    for (let r = 0; r < rows; r++) {
+      const row: AdminSeat[] = [];
+      for (let s = 0; s < seatsPerRow; s++) {
+        // Если есть старая схема - берем из нее, иначе стандартное место
+        const oldSeat = layout[r]?.[s];
+        row.push({
+          row: r + 1,
+          seat: s + 1,
+          type: oldSeat?.type || 'standard',
+        });
+      }
+      newLayout.push(row);
+    }
+    setLayout(newLayout);
+  };
+
+  // Применяем изменения размеров
+  useEffect(() => {
+    updateLayoutSize();
+  }, [rows, seatsPerRow]);
+
+  // Сохранение конфигурации
   const handleSave = async () => {
     if (!selectedHallId) return;
 
+    // Валидация
+    if (rows < 1 || seatsPerRow < 1) {
+      alert('Укажите количество рядов и мест (минимум 1)');
+      return;
+    }
+
     setIsLoading(true);
     try {
+      // Отправляем данные в snake_case
       await axios.put(`/api/halls/${selectedHallId}`, {
-        rows,
-        seatsPerRow,
-        layout,
+        rows: rows,
+        seats_per_row: seatsPerRow, // ← snake_case!
+        layout: layout,
       });
 
-      onConfigurationSaved({
-        hallId: selectedHallId,
-        rows,
-        seatsPerRow,
-        seats: layout,
-      });
-
-      alert('Конфигурация сохранена');
-    } catch {
-      alert('Ошибка при сохранении конфигурации. Попробуйте снова.');
+      onConfigurationSaved(selectedHallId);
+      alert('Конфигурация сохранена!');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Ошибка сохранения';
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -92,6 +135,7 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
   return (
     <ConfigSection title="Конфигурация залов" isOpen={isOpen} onToggle={onToggle}>
       <p className="conf-step__paragraph">Выберите зал для конфигурации:</p>
+      
       <ul className="conf-step__selectors-box">
         {halls.map(hall => (
           <li key={hall.id}>
@@ -110,39 +154,49 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
 
       {selectedHallId && (
         <>
-          <p className="conf-step__paragraph">Укажите количество рядов и максимальное количество кресел в ряду:</p>
+          <p className="conf-step__paragraph">
+            Укажите количество рядов и мест в ряду:
+          </p>
+          
           <div className="conf-step__legend">
             <label className="conf-step__label">
-              Рядов, шт
+              Рядов
               <input
                 type="number"
                 className="conf-step__input"
+                min="1"
+                max="20"
                 value={rows}
-                min={1}
-                onChange={e => setRows(Number(e.target.value))}
+                onChange={(e) => setRows(Number(e.target.value))}
               />
             </label>
+            
             <span className="multiplier">x</span>
+            
             <label className="conf-step__label">
-              Мест, шт
+              Мест в ряду
               <input
                 type="number"
                 className="conf-step__input"
+                min="1"
+                max="20"
                 value={seatsPerRow}
-                min={1}
-                onChange={e => setSeatsPerRow(Number(e.target.value))}
+                onChange={(e) => setSeatsPerRow(Number(e.target.value))}
               />
             </label>
           </div>
 
-          <p className="conf-step__paragraph">Теперь вы можете указать типы кресел на схеме зала:</p>
+          <p className="conf-step__paragraph">
+            Нажмите на кресло, чтобы изменить его тип:
+          </p>
+          
           <div className="conf-step__legend">
-            <span className="conf-step__chair conf-step__chair_standard"></span> — обычные кресла
-            <span className="conf-step__chair conf-step__chair_vip"></span> — VIP кресла
+            <span className="conf-step__chair conf-step__chair_standard"></span> — обычные
+            <span className="conf-step__chair conf-step__chair_vip"></span> — VIP
             <span className="conf-step__chair conf-step__chair_disabled"></span> — заблокированные
-            <p className="conf-step__hint">Чтобы изменить вид кресла, нажмите по нему левой кнопкой мыши</p>
           </div>
 
+          {/* Схема зала */}
           <div className="conf-step__hall">
             <div className="conf-step__hall-wrapper">
               {layout.map((row, rowIndex) => (
@@ -151,9 +205,8 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
                     <span
                       key={seatIndex}
                       className={`conf-step__chair conf-step__chair_${seat.type}`}
-                      onClick={() =>
-                        handleSeatTypeChange(rowIndex, seatIndex, nextType(seat.type))
-                      }
+                      onClick={() => handleSeatClick(rowIndex, seatIndex)}
+                      title={`Ряд ${rowIndex + 1}, Место ${seatIndex + 1}`}
                     />
                   ))}
                 </div>
@@ -161,16 +214,29 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
             </div>
           </div>
 
-          <fieldset className="conf-step__buttons text-center">
-            <ConfigButton variant="regular" onClick={() => setSelectedHallId(null)}>
+          <div className="conf-step__buttons text-center">
+            <ConfigButton
+              variant="regular"
+              onClick={() => {
+                setSelectedHallId(null);
+                setRows(0);
+                setSeatsPerRow(0);
+                setLayout([]);
+              }}
+            >
               Отмена
             </ConfigButton>
-            <ConfigButton variant="accent" onClick={handleSave} disabled={isLoading}>
-              {isLoading ? 'Сохраняем...' : 'Сохранить'}
+            
+            <ConfigButton
+              variant="accent"
+              onClick={handleSave}
+              disabled={isLoading || rows < 1 || seatsPerRow < 1}
+            >
+              {isLoading ? 'Сохранение...' : 'Сохранить'}
             </ConfigButton>
-          </fieldset>
+          </div>
         </>
-      )}      
+      )}
     </ConfigSection>
   );
 };

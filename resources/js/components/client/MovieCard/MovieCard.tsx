@@ -5,38 +5,52 @@ import type { ClientMovie } from '../../../types/client';
 import './MovieCard.css';
 
 interface MovieCardProps {
-    movie: ClientMovie;
+  movie: ClientMovie;
 }
 
 export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
-    return (
-        <section className="movie">
-            <div className="movie__info">
-                <MoviePoster
-                    title={movie.title}
-                    poster={movie.poster}
-                />
+  // Форматируем продолжительность
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours} ч ${mins} мин`;
+    }
+    return `${mins} мин`;
+  };
 
-                <MovieDescription
-                    title={movie.title}
-                    synopsis={movie.synopsis}
-                    duration={movie.duration}
-                    origin={movie.origin}
-                />
-            </div>
+  return (
+    <section className="movie">
+      <div className="movie__info">
+        <MoviePoster
+          title={movie.title}
+          poster={movie.posterUrl}
+        />
 
-            {/* Рендерим залы с расписанием */}
-            {movie.halls.length > 0 ? (
-                movie.halls.map((hall, index) => (
-                    <HallSchedule
-                        key={index}
-                        hall={hall}
-                        movieTitle={movie.title}
-                    />
-                ))
-            ) : (
-                <p className="no-screenings">Сеансов пока нет</p>
-            )}
-        </section>
-    );
+        <MovieDescription
+          title={movie.title}
+          synopsis={movie.synopsis}
+          duration={formatDuration(movie.duration)}
+          origin={movie.origin}
+        />
+      </div>
+      
+      {/* Рендерим залы с расписанием */}
+      {movie.halls.length > 0 ? (
+        movie.halls.map((hall) => (
+          <HallSchedule
+            key={hall.id}
+            hall={hall}
+            movieTitle={movie.title}
+          />
+        ))
+      ) : (
+        <div className="movie-seances__hall">
+          <h3 className="movie-seances__hall-title">Нет сеансов</h3>
+          <p className="no-screenings">На выбранную дату сеансов нет</p>
+        </div>
+      )}
+    </section>
+  );
 };
