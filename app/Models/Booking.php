@@ -11,6 +11,7 @@ class Booking extends Model
         'seats',
         'total_price',
         'booking_code',
+        'email',
     ];
 
     protected $casts = [

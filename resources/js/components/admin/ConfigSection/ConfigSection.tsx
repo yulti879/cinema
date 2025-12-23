@@ -5,13 +5,15 @@ interface ConfigSectionProps {
   isOpen?: boolean;
   onToggle?: () => void;
   children: React.ReactNode;
+  wrapperClassName?: string;
 }
 
 export const ConfigSection: React.FC<ConfigSectionProps> = ({ 
   title, 
   isOpen = true,
   onToggle,
-  children 
+  children,
+  wrapperClassName
 }) => {
   return (
     <section className="conf-step">
@@ -22,7 +24,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
         <h2 className="conf-step__title">{title}</h2>
       </header>
       {isOpen && (
-        <div className="conf-step__wrapper">
+        <div className={`conf-step__wrapper ${wrapperClassName || ''}`}>
           {children}
         </div>
       )}

@@ -10,6 +10,8 @@ export const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
+  const [email, setEmail] = useState('');
+
   const paymentData = location.state as Payment | null;
 
   if (!paymentData || paymentData.seats.length === 0) {
@@ -24,57 +26,70 @@ export const PaymentPage: React.FC = () => {
   }
 
   const handleGetTicket = async () => {
-  setIsLoading(true);
+    setIsLoading(true);
 
-  try {
-    const csrfToken = document
-      .querySelector('meta[name="csrf-token"]')
-      ?.getAttribute('content');
+    try {
+      const csrfToken = document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute('content');
 
-    const response = await fetch('/api/bookings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-CSRF-TOKEN': csrfToken ?? '',
-      },
-      body: JSON.stringify({
-        screening_id: paymentData.screeningId,
-        seats: paymentData.seats,        
-      }),
-    });
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken ?? '',
+        },
+        body: JSON.stringify({
+          screening_id: paymentData.screeningId,
+          seats: paymentData.seats,
+          email: email || null,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      alert(data.message || data.error || 'Ошибка бронирования');
-      return;
+      if (!response.ok) {
+        alert(data.message || data.error || 'Ошибка бронирования');
+        return;
+      }
+
+      const ticket: Ticket = {
+        bookingCode: data.booking_code,
+        movieTitle: paymentData.movieTitle,
+        startTime: paymentData.startTime,
+        hallName: paymentData.hallName,
+        date: paymentData.date,
+        seats: paymentData.seats.map(
+          s => `Ряд ${s.row}, Место ${s.seat}`
+        ),
+        totalPrice: paymentData.totalPrice,
+        qrCodeUrl: data.qr_code_url,
+      };
+
+      navigate('/ticket', { state: ticket });
+    } catch (err) {
+      alert(`Ошибка бронирования: ${(err as Error).message}`);
+    } finally {
+      setIsLoading(false);
     }
-
-    const ticket: Ticket = {
-      bookingCode: data.booking_code,
-      movieTitle: paymentData.movieTitle,
-      startTime: paymentData.startTime,
-      hallName: paymentData.hallName,
-      date: paymentData.date,
-      seats: paymentData.seats.map(
-        s => `Ряд ${s.row}, Место ${s.seat}`
-      ),
-      totalPrice: paymentData.totalPrice,
-      qrCodeUrl: data.qr_code_url,
-    };
-
-    navigate('/ticket', { state: ticket });
-  } catch (err) {
-    alert(`Ошибка бронирования: ${(err as Error).message}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   return (
     <ClientLayout>
       <ClientHeader />
+      <div className='email_input'>
+        <label>
+          Email (необязательно):
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="example@mail.com"
+            style={{ width: '100%', marginTop: 8 }}
+          />
+        </label>
+      </div>
       <TicketLayout
         type="payment"
         movieTitle={paymentData.movieTitle}

@@ -45,6 +45,12 @@ select {
   font-weight: 600;
 }
 
+.email_input {
+  padding: 16px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
 @media screen and (min-width: 990px) {
   main {
     width: 990px;

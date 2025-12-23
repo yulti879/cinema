@@ -6,20 +6,33 @@ use App\Models\Booking;
 use App\Models\Screening;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 
 class BookingController extends Controller
 {
     public function store(Request $request)
     {
+
         $data = $request->validate([
             'screening_id' => 'required|exists:screenings,id',
             'seats'        => 'required|array|min:1',
             'seats.*.row'  => 'required|integer|min:1',
             'seats.*.seat' => 'required|integer|min:1',
             'seats.*.type' => 'required|in:standard,vip',
+            'email'        => 'nullable|email',
         ]);
 
         $screening = Screening::with('hall')->findOrFail($data['screening_id']);
+
+        $screeningDateTime = Carbon::parse(
+            $screening->date . ' ' . $screening->start_time
+        );
+
+        if ($screeningDateTime->isPast()) {
+            return response()->json([
+                'message' => 'Этот сеанс уже завершён. Бронирование невозможно.'
+            ], 422);
+        }
 
         $bookedSeats = $screening->booked_seats ?? [];
 
@@ -47,6 +60,7 @@ class BookingController extends Controller
             'seats' => $data['seats'],
             'total_price' => $totalPrice,
             'booking_code' => $bookingCode,
+            'email' => $data['email'] ?? null,
         ]);
 
         $newBookedSeats = array_map(

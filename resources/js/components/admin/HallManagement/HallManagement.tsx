@@ -26,85 +26,49 @@ export const HallManagement: React.FC<HallManagementProps> = ({
   const [isDeletePopupOpen, setIsDeletePopupOpen] = useState(false);
   const [hallToDelete, setHallToDelete] = useState<AdminHall | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Добавление зала
   const handleAddHall = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const name = newHallName.trim();
-
-    // Валидация
-    if (!name) {
-      alert('Пожалуйста, введите название зала');
+    if (!name || name.length < 2) {
+      setError('Название зала должно быть минимум 2 символа');
       return;
     }
 
-    if (name.length < 2) {
-      alert('Название зала должно быть минимум 2 символа');
-      return;
-    }
-
-    // Проверяем, нет ли уже зала с таким названием
-    const existingHall = halls.find(h =>
-      h.name.toLowerCase() === name.toLowerCase()
-    );
-
+    const existingHall = halls.find(h => h.name.toLowerCase() === name.toLowerCase());
     if (existingHall) {
-      alert(`Зал с названием "${name}" уже существует`);
+      setError(`Зал с названием "${name}" уже существует`);
       return;
     }
 
     setIsLoading(true);
+    setError(null);
     try {
-      // Отправляем данные на сервер
       const response = await axios.post('/api/halls', {
-        name: name,
-        rows: 10,          // Дефолтное количество рядов
-        seats_per_row: 8,  // Дефолтное количество мест в ряду
-        standard_price: 0, // Цена по умолчанию для обычных мест
-        vip_price: 0,      // Цена по умолчанию для VIP мест
-        layout: null,      // Пустая схема (сгенерируется на бэкенде)
+        name,
+        rows: 10,
+        seats_per_row: 8,
+        standard_price: 0,
+        vip_price: 0,
+        layout: null,
       });
 
-      // Проверяем успешный ответ
       if (response.data && response.data.data) {
         const newHall = response.data.data;
-
-        // Уведомляем родительский компонент
         onHallCreated(newHall);
-
-        // Закрываем попап и сбрасываем форму
         setIsAddHallPopupOpen(false);
-        setNewHallName('');        
+        setNewHallName('');
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000); // сброс статуса через 3 сек
       } else {
-        throw new Error('Сервер вернул некорректные данные');
+        setError('Сервер вернул некорректные данные');
       }
-
     } catch (err: any) {
-      console.error('Ошибка при создании зала:', err);
-
-      // Детализированная обработка ошибок
-      if (err.response) {
-        // Ошибка от сервера
-        const serverError = err.response.data;
-
-        if (serverError.errors) {
-          // Laravel валидационные ошибки
-          const firstError = Object.values(serverError.errors)[0];
-          alert(Array.isArray(firstError) ? firstError[0] : firstError);
-        } else if (serverError.message) {
-          // Сообщение об ошибке
-          alert(serverError.message);
-        } else {
-          alert('Ошибка сервера при создании зала');
-        }
-      } else if (err.request) {
-        // Нет ответа от сервера
-        alert('Не удалось соединиться с сервером. Проверьте подключение.');
-      } else {
-        // Другая ошибка
-        alert(err.message || 'Неизвестная ошибка при создании зала');
-      }
+      setError(err.response?.data?.message || 'Ошибка при создании зала');
     } finally {
       setIsLoading(false);
     }
@@ -116,21 +80,35 @@ export const HallManagement: React.FC<HallManagementProps> = ({
     if (!hallToDelete) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       await axios.delete(`/api/halls/${hallToDelete.id}`);
       onHallDeleted(hallToDelete.id);
       setIsDeletePopupOpen(false);
       setHallToDelete(null);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      const error = err.response?.data?.error || 'Не удалось удалить зал';
-      alert(error);
+      setError(err.response?.data?.error || 'Не удалось удалить зал');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <ConfigSection title="Управление залами" isOpen={isOpen} onToggle={onToggle}>
+    <ConfigSection
+      title="Управление залами"
+      isOpen={isOpen}
+      onToggle={onToggle}
+      wrapperClassName={isSaved ? 'conf-step__wrapper__save-status' : ''}
+    >
+      {error && (
+        <div className="error-message" style={{ color: '#ff0000' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ marginLeft: '10px' }}>×</button>
+        </div>
+      )}
+
       {halls.length > 0 ? (
         <ul className="conf-step__list">
           {halls.map(hall => (
@@ -156,6 +134,7 @@ export const HallManagement: React.FC<HallManagementProps> = ({
       <ConfigButton
         variant="accent"
         onClick={() => setIsAddHallPopupOpen(true)}
+        disabled={isLoading}
       >
         Создать зал
       </ConfigButton>
@@ -184,8 +163,8 @@ export const HallManagement: React.FC<HallManagementProps> = ({
           </label>
 
           <div className="conf-step__buttons text-center">
-            <ConfigButton variant="accent" type="submit">
-              Добавить зал
+            <ConfigButton variant="accent" type="submit" disabled={isLoading}>
+              {isLoading ? 'Обработка...' : 'Добавить зал'}
             </ConfigButton>
             <ConfigButton
               variant="regular"
@@ -218,6 +197,7 @@ export const HallManagement: React.FC<HallManagementProps> = ({
             setIsDeletePopupOpen(false);
             setHallToDelete(null);
           }}
+          submitText={isLoading ? 'Удаление...' : 'Удалить'}
         />
       </Popup>
     </ConfigSection>

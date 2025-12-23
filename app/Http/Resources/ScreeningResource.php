@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 class ScreeningResource extends JsonResource
 {
@@ -11,12 +12,21 @@ class ScreeningResource extends JsonResource
 
     public function toArray(Request $request): array
     {
+        // безопасный парсинг даты и времени
+        $dateTime = null;
+        try {
+            $dateTime = Carbon::parse("{$this->date} {$this->start_time}");
+        } catch (\Exception $e) {
+            $dateTime = now()->addDay(); // если ошибка — считаем будущее
+        }
+
         return [
             'id' => $this->id,
             'movieId' => $this->movie_id,
             'hallId' => $this->hall_id,
             'date' => $this->date,
             'startTime' => $this->start_time,
+            'isPast' => $dateTime->isPast(),
             'bookedSeats' => $this->booked_seats ?? [],
 
             'movie' => $this->whenLoaded('movie', function () {

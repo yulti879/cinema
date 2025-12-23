@@ -19,7 +19,10 @@ class ScreeningController extends Controller
         if ($request->has('date')) {
             $query->where('date', $request->date);
         } else {
-            $query->where('date', '>=', now()->format('Y-m-d'));
+            $query->whereBetween('date', [
+                now()->toDateString(),
+                now()->addDays(7)->toDateString()
+            ]);
         }
 
         $screenings = $query
@@ -52,10 +55,7 @@ class ScreeningController extends Controller
             'start_time' => ['required', 'date_format:H:i'],
         ]);
 
-        $startDateTime = Carbon::parse(
-            "{$data['date']} {$data['start_time']}"
-        );
-
+        $startDateTime = Carbon::createFromFormat('Y-m-d H:i', "{$data['date']} {$data['start_time']}");
         if ($startDateTime->isPast()) {
             return response()->json([
                 'message' => 'Нельзя создать сеанс в прошлом',

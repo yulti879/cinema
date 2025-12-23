@@ -138,21 +138,19 @@
   background-color: #848484;
 }
 
-.popup__poster {
-  height: 200px;
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
+.conf-step__seances-date {
+  margin: 30px 0 10px 0;
+  padding: 10px 15px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 
-.popup__form {
-  width: 100%;
-}
-
-.trash-seance{
-  width: 40px;
-  height: 40px;
-  position: absolute;
-  left: -50px;
-  top: 25px;
-  display: none;
+.conf-step__seances-date-title {
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: #333;
+  margin: 0;
+  line-height: 1.4;
+  text-transform: uppercase;
 }

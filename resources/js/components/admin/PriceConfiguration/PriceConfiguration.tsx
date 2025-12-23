@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { AdminHall, PriceData } from '../../../types/admin';
+import { AdminHall, PriceData, UpdateHallPricesDTO } from '../../../types/admin';
 import { ConfigSection } from '../ConfigSection/ConfigSection';
 import { ConfigButton } from '../ConfigButton/ConfigButton';
 import { FormField } from '../FormField/FormField';
-
 import './PriceConfiguration.css';
 
 interface PriceConfigurationProps {
@@ -24,12 +23,12 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
   const [standardPrice, setStandardPrice] = useState<number>(0);
   const [vipPrice, setVipPrice] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   const isHallSelected = Boolean(selectedHall);
 
-  /**
-   * Загружаем цены при выборе зала
-   */
+  // Загружаем цены при выборе зала
   useEffect(() => {
     if (!selectedHall) {
       setStandardPrice(0);
@@ -39,13 +38,14 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
 
     const fetchPrices = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const res = await axios.get(`/api/halls/${selectedHall}`);
         setStandardPrice(res.data.standard_price ?? 0);
         setVipPrice(res.data.vip_price ?? 0);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Ошибка загрузки цен:', err);
-        alert('Не удалось загрузить цены для зала');
+        setError('Не удалось загрузить цены для зала');
       } finally {
         setIsLoading(false);
       }
@@ -54,32 +54,30 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
     fetchPrices();
   }, [selectedHall]);
 
-  /**
-   * Разрешаем ввод только чисел >= 0
-   */
+  // Разрешаем ввод только чисел >= 0
   const handlePriceChange = (
     setter: React.Dispatch<React.SetStateAction<number>>,
     value: string
   ) => {
     const num = Number(value.replace(/\D/g, ''));
-    if (!isNaN(num)) {
-      setter(num);
-    }
+    if (!isNaN(num)) setter(num);
   };
 
-  /**
-   * Сохранение цен
-   */
+  // Сохранение цен
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedHall) return;
 
     setIsLoading(true);
+    setError(null);
+
+    const payload: UpdateHallPricesDTO = {
+      standard_price: standardPrice,
+      vip_price: vipPrice,
+    };
+
     try {
-      await axios.put(`/api/halls/${selectedHall}`, {
-        standardPrice,
-        vipPrice
-      });
+      await axios.put(`/api/halls/${selectedHall}`, payload);
 
       onPricesSaved({
         hallId: selectedHall,
@@ -89,10 +87,12 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
         timestamp: new Date().toISOString()
       });
 
-      alert('Цены успешно сохранены');
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+
     } catch (err) {
       console.error('Ошибка сохранения цен:', err);
-      alert('Не удалось сохранить цены');
+      setError('Не удалось сохранить цены');
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +103,15 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
       title="Конфигурация цен"
       isOpen={isOpen}
       onToggle={onToggle}
+      wrapperClassName={isSaved ? 'conf-step__wrapper__save-status' : ''}
     >
+      {error && (
+        <div className="error-message" style={{ color: '#ff0000' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ marginLeft: '10px' }}>×</button>
+        </div>
+      )}
+
       <p className="conf-step__paragraph">
         Выберите зал для конфигурации:
       </p>
@@ -136,9 +144,7 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
             name="standardPrice"
             type="text"
             value={standardPrice}
-            onChange={e =>
-              handlePriceChange(setStandardPrice, e.target.value)
-            }
+            onChange={e => handlePriceChange(setStandardPrice, e.target.value)}
             disabled={!isHallSelected || isLoading}
           />
           за <span className="conf-step__chair conf-step__chair_standard"></span>{' '}
@@ -151,9 +157,7 @@ export const PriceConfiguration: React.FC<PriceConfigurationProps> = ({
             name="vipPrice"
             type="text"
             value={vipPrice}
-            onChange={e =>
-              handlePriceChange(setVipPrice, e.target.value)
-            }
+            onChange={e => handlePriceChange(setVipPrice, e.target.value)}
             disabled={!isHallSelected || isLoading}
           />
           за <span className="conf-step__chair conf-step__chair_vip"></span>{' '}

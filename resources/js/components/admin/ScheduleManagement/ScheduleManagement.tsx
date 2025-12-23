@@ -52,8 +52,8 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   const [screeningToDelete, setScreeningToDelete] = useState<AdminScreening | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState(false); // для отображения класса conf-step__wrapper__save-status
 
-  // Синхронизация локального состояния при изменении пропсов
   useEffect(() => setLocalMovies(movies.map(m => ({ ...m, id: m.id.toString() }))), [movies]);
   useEffect(() => setLocalScreenings(screenings.map(s => ({
     ...s,
@@ -62,11 +62,15 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
     hallId: s.hallId.toString(),
   }))), [screenings]);
 
+  const showSaveStatus = () => {
+    setSaveStatus(true);
+    setTimeout(() => setSaveStatus(false), 2000); // через 2 сек убираем класс
+  };
+
   // Добавление фильма
   const handleMovieAdded = async (dto: CreateMovieDTO): Promise<void> => {
     setIsLoading(true);
     setError(null);
-
     try {
       const formData = new FormData();
       formData.append('title', dto.title);
@@ -91,7 +95,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       setLocalMovies(prev => [...prev, newMovie]);
       onMovieCreated?.(newMovie);
       setIsAddMoviePopupOpen(false);
-
+      showSaveStatus();
     } catch (err: any) {
       console.error('Error adding movie:', err);
       setError(err.response?.data?.message || 'Ошибка при добавлении фильма');
@@ -110,7 +114,6 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       const movie = localMovies.find(m => m.id === dto.movieId.toString());
       if (!movie) throw new Error('Фильм не найден');
 
-      // Преобразуем поля в snake_case для Laravel
       const payload = {
         movie_id: dto.movieId,
         hall_id: dto.hallId,
@@ -133,7 +136,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       setLocalScreenings(prev => [...prev, newScreening]);
       onScreeningCreated?.(newScreening);
       setIsAddScreeningPopupOpen(false);
-
+      showSaveStatus();
     } catch (err: any) {
       console.error('Error adding screening:', err);
       setError(err.response?.data?.message || 'Ошибка при добавлении сеанса');
@@ -154,6 +157,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       setLocalMovies(prev => prev.filter(m => m.id !== movieToDelete.id));
       onMovieDeleted?.(movieToDelete.id);
       setMovieToDelete(null);
+      showSaveStatus();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при удалении фильма');
     } finally {
@@ -172,6 +176,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
       setLocalScreenings(prev => prev.filter(s => s.id !== screeningToDelete.id));
       onScreeningDeleted?.(screeningToDelete.id);
       setScreeningToDelete(null);
+      showSaveStatus();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при удалении сеанса');
     } finally {
@@ -201,58 +206,55 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
   };
 
   if (!isOpen) {
-    return (
-      <ConfigSection title="Сетка сеансов" isOpen={isOpen} onToggle={onToggle}>
-        <></>
-      </ConfigSection>
-    );
+    return <ConfigSection title="Сетка сеансов" isOpen={isOpen} onToggle={onToggle}><></></ConfigSection>;
   }
 
   const colors = [
-    '#caff85',
-    '#85ff89',
-    '#85ffd3',
-    '#85e2ff',
-    '#8599ff',
-    '#ba85ff',
-    '#ff85fb',
-    '#ff85b1',
-    '#ffa285',
+    '#caff85', '#85ff89', '#85ffd3', '#85e2ff', '#8599ff',
+    '#ba85ff', '#ff85fb', '#ff85b1', '#ffa285',
   ];
 
   const movieColors: Record<string, string> = Object.fromEntries(
     localMovies.map((m, i) => [m.id, colors[i % colors.length]])
   );
 
+  const screeningsByDate: Record<string, AdminScreening[]> = localScreenings.reduce((acc, s) => {
+    if (!acc[s.date]) acc[s.date] = [];
+    acc[s.date].push(s);
+    return acc;
+  }, {} as Record<string, AdminScreening[]>);
+
+  const sortedDates = Object.keys(screeningsByDate).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
   return (
-    <ConfigSection title="Сетка сеансов" isOpen={isOpen} onToggle={onToggle}>
+    <ConfigSection
+      title="Сетка сеансов"
+      isOpen={isOpen}
+      onToggle={onToggle}
+      wrapperClassName={saveStatus ? "conf-step__wrapper__save-status" : ""}
+    >
       {error && (
         <div className="error-message" style={{ color: '#ff0000' }}>
           {error}
           <button onClick={() => setError(null)} style={{ marginLeft: '10px' }}>×</button>
         </div>
       )}
+      <p className="conf-step__paragraph">
+        <div className="conf-step__buttons">
+          <ConfigButton variant="accent" onClick={() => setIsAddMoviePopupOpen(true)} disabled={isLoading}>
+            Добавить фильм
+          </ConfigButton>
+          <ConfigButton
+            variant="accent"
+            onClick={() => setIsAddScreeningPopupOpen(true)}
+            disabled={localMovies.length === 0 || halls.length === 0 || isLoading}
+            title={localMovies.length === 0 ? "Добавьте фильмы" : halls.length === 0 ? "Добавьте залы" : ""}
+          >
+            Добавить сеанс
+          </ConfigButton>
+        </div>
+      </p>
 
-      <div className="conf-step__buttons">
-        <ConfigButton
-          variant="accent"
-          onClick={() => setIsAddMoviePopupOpen(true)}
-          disabled={isLoading}
-        >
-          Добавить фильм
-        </ConfigButton>
-
-        <ConfigButton
-          variant="accent"
-          onClick={() => setIsAddScreeningPopupOpen(true)}
-          disabled={localMovies.length === 0 || halls.length === 0 || isLoading}
-          title={localMovies.length === 0 ? "Добавьте фильмы" : halls.length === 0 ? "Добавьте залы" : ""}
-        >
-          Добавить сеанс
-        </ConfigButton>
-      </div>
-
-      {/* Список фильмов */}
       {localMovies.length > 0 && (
         <div className="conf-step__movies">
           {localMovies.map(movie => (
@@ -278,69 +280,71 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
         </div>
       )}
 
-      {/* Сетка сеансов */}
-      {localScreenings.length > 0 && (
-        <div className="conf-step__seances">
-          {halls.map(hall => {
-            const hallScreenings = localScreenings
-              .filter(s => s.hallId === hall.id.toString())
-              .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      {sortedDates.map(date => {
+        const formattedDate = new Date(date).toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
 
-            if (hallScreenings.length === 0) return null;
+        return (
+          <div key={date} className="conf-step__seances-date">
+            <h3 className="conf-step__seances-date-title">{formattedDate}</h3>
+            {halls.map(hall => {
+              const hallScreenings = screeningsByDate[date].filter(s => s.hallId === hall.id.toString())
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+              if (!hallScreenings.length) return null;
 
-            // Для корректного смещения сеансов
-            const lastMovieEnd: Record<string, number> = {};
+              const lastMovieEnd: Record<string, number> = {};
 
-            return (
-              <div key={hall.id} className="conf-step__seances-hall">
-                <h3 className="conf-step__seances-title">{hall.name}</h3>
-                <div className="conf-step__seances-timeline">
-                  {hallScreenings.map(screening => {
-                    const movie = localMovies.find(m => m.id === screening.movieId.toString());
-                    if (!movie) return null;
-                    
-                    const startTime = screening.startTime.split('T')[1]?.substring(0, 5) || screening.startTime;
-                    
-                    const [hour, minute] = startTime.split(':').map(Number);
-                    let left = (hour * 60 + minute) / (24 * 60) * 100;
-                    const width = (movie.duration / (24 * 60)) * 100;
-                    
-                    if (lastMovieEnd[screening.movieId]) {
-                      left = Math.max(left, lastMovieEnd[screening.movieId] + 0.5); // 0.5% отступ
-                    }
-                    lastMovieEnd[screening.movieId] = left + width;
+              return (
+                <div key={hall.id} className="conf-step__seances-hall">
+                  <h4 className="conf-step__seances-title">{hall.name}</h4>
+                  <div className="conf-step__seances-timeline">
+                    {hallScreenings.map(screening => {
+                      const movie = localMovies.find(m => m.id === screening.movieId.toString());
+                      if (!movie) return null;
 
-                    return (
-                      <div
-                        key={screening.id}
-                        className="conf-step__seances-movie"
-                        style={{
-                          width: `${width}%`,
-                          left: `${left}%`,
-                          backgroundColor: movieColors[screening.movieId],
-                        }}
-                        title={`${movie.title} ${startTime}`}
-                      >
-                        <p className="conf-step__seances-movie-title">{movie.title}</p>
-                        <p className="conf-step__seances-movie-start">{startTime}</p>
-                        <button
-                          className="conf-step__seances-movie-delete"
-                          onClick={() => setScreeningToDelete(screening)}
-                          title="Удалить сеанс"
+                      const startTime = screening.startTime.includes('T')
+                        ? screening.startTime.split('T')[1].substring(0, 5)
+                        : screening.startTime;
+
+                      const [hour, minute] = startTime.split(':').map(Number);
+                      let left = (hour * 60 + minute) / (24 * 60) * 100;
+                      const width = (movie.duration / (24 * 60)) * 100;
+
+                      if (lastMovieEnd[screening.movieId]) {
+                        left = Math.max(left, lastMovieEnd[screening.movieId] + 0.5);
+                      }
+                      lastMovieEnd[screening.movieId] = left + width;
+
+                      return (
+                        <div
+                          key={screening.id}
+                          className="conf-step__seances-movie"
+                          style={{ width: `${width}%`, left: `${left}%`, backgroundColor: movieColors[screening.movieId] }}
+                          title={`${movie.title} ${startTime}`}
                         >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <p className="conf-step__seances-movie-title">{movie.title}</p>
+                          <p className="conf-step__seances-movie-start">{startTime}</p>
+                          <button
+                            className="conf-step__seances-movie-delete"
+                            onClick={() => setScreeningToDelete(screening)}
+                            title="Удалить сеанс"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        );
+      })}
 
-      {/* Попапы */}
       <AddMoviePopup
         isOpen={isAddMoviePopupOpen}
         onClose={() => setIsAddMoviePopupOpen(false)}
@@ -356,11 +360,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
         onScreeningAdded={handleScreeningAdded}
       />
 
-      <Popup
-        isOpen={!!movieToDelete}
-        onClose={() => setMovieToDelete(null)}
-        title="Удаление фильма"
-      >
+      <Popup isOpen={!!movieToDelete} onClose={() => setMovieToDelete(null)} title="Удаление фильма">
         <DeleteForm
           message="Вы действительно хотите удалить фильм"
           itemName={movieToDelete?.title || ''}
@@ -370,11 +370,7 @@ export const ScheduleManagement: React.FC<ScheduleManagementProps> = ({
         />
       </Popup>
 
-      <Popup
-        isOpen={!!screeningToDelete}
-        onClose={() => setScreeningToDelete(null)}
-        title="Удаление сеанса"
-      >
+      <Popup isOpen={!!screeningToDelete} onClose={() => setScreeningToDelete(null)} title="Удаление сеанса">
         <DeleteForm
           message="Вы действительно хотите удалить сеанс"
           itemName={screeningToDelete?.movie?.title || ''}

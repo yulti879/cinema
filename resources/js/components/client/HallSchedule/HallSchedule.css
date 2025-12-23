@@ -26,3 +26,10 @@
   text-decoration: none;
   font-size: 1.5rem;
 }
+
+.movie-seances__time--past {
+  color: #aaa;
+  cursor: not-allowed;
+  pointer-events: none;     /* отключаем клики */
+  opacity: 0.6;
+}

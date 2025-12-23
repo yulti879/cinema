@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Seat, Screening } from '../../../types/client';
-import { convertAdminHallToClient } from '../../../utils/convertTypes';
 import './Hall.css';
 
 export const Hall: React.FC = () => {
@@ -14,7 +13,7 @@ export const Hall: React.FC = () => {
   const [screening, setScreening] = useState<Screening | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const seatPrices = { standard: 250, vip: 350 };
 
   useEffect(() => {
@@ -26,28 +25,20 @@ export const Hall: React.FC = () => {
 
       try {
         setIsLoading(true);
-
-        // 1. Загружаем сеанс
+        
         const screeningRes = await fetch(`/api/screenings/${screeningId}`);
         if (!screeningRes.ok) throw new Error('Сеанс не найден');
 
         const screeningData: Screening = await screeningRes.json();
         setScreening(screeningData);
         setBookedSeats(screeningData.bookedSeats || []);
-
-        // 2. Загружаем зал
+        
         const hallRes = await fetch(`/api/halls/${screeningData.hallId}`);
         if (!hallRes.ok) throw new Error('Зал не найден');
 
-        const adminHall = await hallRes.json();
+        const hallData = await hallRes.json();
+        setHallLayout(hallData.layout);
 
-        // 3. Конвертируем зал в клиентский формат
-        const clientHall = convertAdminHallToClient(
-          adminHall,
-          screeningData.bookedSeats || []
-        );
-
-        setHallLayout(clientHall.layout);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
       } finally {
@@ -57,6 +48,7 @@ export const Hall: React.FC = () => {
 
     fetchData();
   }, [screeningId]);
+
 
   // Клик по месту
   const handleSeatClick = (rowIndex: number, seatIndex: number, seatType: Seat['type']) => {
@@ -145,7 +137,7 @@ export const Hall: React.FC = () => {
             <p className="buying__info-hall">{screening.hall?.name || 'Зал'}</p>
           </div>
           <div className="buying__info-hint">
-            <p>Тапните дважды,<br/>чтобы увеличить</p>
+            <p>Тапните дважды,<br />чтобы увеличить</p>
           </div>
         </div>
 
@@ -190,8 +182,8 @@ export const Hall: React.FC = () => {
           </div>
         </div>
 
-        <button 
-          className="accept-button" 
+        <button
+          className="accept-button"
           onClick={handleBooking}
           disabled={selectedSeats.length === 0}
         >

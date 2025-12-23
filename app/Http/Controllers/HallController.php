@@ -58,6 +58,8 @@ class HallController extends Controller
             'rows' => ['sometimes', 'integer', 'min:1', 'max:20'],
             'seats_per_row' => ['sometimes', 'integer', 'min:1', 'max:20'],
             'layout' => ['nullable', 'array'],
+            'standard_price' => ['sometimes', 'integer', 'min:0'],
+            'vip_price' => ['sometimes', 'integer', 'min:0'],
         ]);
 
         $hall->update([
@@ -65,6 +67,8 @@ class HallController extends Controller
             'rows' => $data['rows'] ?? $hall->rows,
             'seats_per_row' => $data['seats_per_row'] ?? $hall->seats_per_row,
             'layout' => $data['layout'] ?? $hall->layout,
+            'standard_price' => $data['standard_price'] ?? $hall->standard_price,
+            'vip_price' => $data['vip_price'] ?? $hall->vip_price,
         ]);
 
         return response()->json([

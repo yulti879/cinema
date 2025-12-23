@@ -83,3 +83,10 @@ export interface PriceData {
   vipPrice: number;
   timestamp: string;
 }
+
+// ========== DTO для API-запроса ==========
+
+export interface UpdateHallPricesDTO {
+  standard_price: number;
+  vip_price: number;
+}

@@ -25,6 +25,8 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
   const [seatsPerRow, setSeatsPerRow] = useState<number>(0);
   const [layout, setLayout] = useState<AdminSeat[][]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Загружаем конфигурацию при выборе зала
   useEffect(() => {
@@ -34,7 +36,7 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
       setLayout([]);
       return;
     }
-    
+
     const hall = halls.find(h => h.id === selectedHallId);
     if (!hall) {
       setRows(0);
@@ -43,13 +45,11 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
       return;
     }
 
-    // Берем значения из БД (если нет - ставим 0)
     setRows(hall.rows || 0);
     setSeatsPerRow(hall.seatsPerRow || 0);
     setLayout(hall.layout || []);
   }, [selectedHallId, halls]);
 
-  // Изменение типа кресла
   const handleSeatTypeChange = (rowIndex: number, seatIndex: number, type: AdminSeatType) => {
     setLayout(prev => {
       const newLayout = prev.map(r => [...r]);
@@ -58,23 +58,18 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
     });
   };
 
-  // Цикл типов кресел для админки: standard → vip → disabled → standard
   const nextType = (current: AdminSeatType): AdminSeatType => {
     if (current === 'standard') return 'vip';
     if (current === 'vip') return 'disabled';
     return 'standard';
   };
 
-  // Обработчик клика на кресло
   const handleSeatClick = (rowIndex: number, seatIndex: number) => {
     const currentType = layout[rowIndex][seatIndex].type;
-    const newType = nextType(currentType);
-    handleSeatTypeChange(rowIndex, seatIndex, newType);
+    handleSeatTypeChange(rowIndex, seatIndex, nextType(currentType));
   };
 
-  // Создание новой схемы при изменении размеров
   const updateLayoutSize = () => {
-    // Если хотя бы одно значение 0 - очищаем layout
     if (rows < 1 || seatsPerRow < 1) {
       setLayout([]);
       return;
@@ -84,7 +79,6 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
     for (let r = 0; r < rows; r++) {
       const row: AdminSeat[] = [];
       for (let s = 0; s < seatsPerRow; s++) {
-        // Если есть старая схема - берем из нее, иначе стандартное место
         const oldSeat = layout[r]?.[s];
         row.push({
           row: r + 1,
@@ -97,42 +91,51 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
     setLayout(newLayout);
   };
 
-  // Применяем изменения размеров
   useEffect(() => {
     updateLayoutSize();
   }, [rows, seatsPerRow]);
 
-  // Сохранение конфигурации
   const handleSave = async () => {
     if (!selectedHallId) return;
 
-    // Валидация
     if (rows < 1 || seatsPerRow < 1) {
-      alert('Укажите количество рядов и мест (минимум 1)');
+      setError('Укажите количество рядов и мест (минимум 1)');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
     try {
-      // Отправляем данные в snake_case
       await axios.put(`/api/halls/${selectedHallId}`, {
-        rows: rows,
-        seats_per_row: seatsPerRow, // ← snake_case!
-        layout: layout,
+        rows,
+        seats_per_row: seatsPerRow,
+        layout,
       });
 
       onConfigurationSaved(selectedHallId);
-      alert('Конфигурация сохранена!');
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Ошибка сохранения';
-      alert(errorMessage);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Ошибка сохранения');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <ConfigSection title="Конфигурация залов" isOpen={isOpen} onToggle={onToggle}>
+    <ConfigSection
+      title="Конфигурация залов"
+      isOpen={isOpen}
+      onToggle={onToggle}
+      wrapperClassName={isSaved ? 'conf-step__wrapper__save-status' : ''}
+    >
+      {error && (
+        <div className="error-message" style={{ color: '#ff0000' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ marginLeft: '10px' }}>×</button>
+        </div>
+      )}
+
       <p className="conf-step__paragraph">Выберите зал для конфигурации:</p>
       
       <ul className="conf-step__selectors-box">
@@ -163,10 +166,10 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
               <input
                 type="number"
                 className="conf-step__input"
-                min="1"
-                max="20"
+                min={1}
+                max={20}
                 value={rows}
-                onChange={(e) => setRows(Number(e.target.value))}
+                onChange={e => setRows(Number(e.target.value))}
               />
             </label>
             
@@ -177,10 +180,10 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
               <input
                 type="number"
                 className="conf-step__input"
-                min="1"
-                max="20"
+                min={1}
+                max={20}
                 value={seatsPerRow}
-                onChange={(e) => setSeatsPerRow(Number(e.target.value))}
+                onChange={e => setSeatsPerRow(Number(e.target.value))}
               />
             </label>
           </div>
@@ -195,7 +198,6 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
             <span className="conf-step__chair conf-step__chair_disabled"></span> — заблокированные
           </div>
 
-          {/* Схема зала */}
           <div className="conf-step__hall">
             <div className="conf-step__hall-wrapper">
               {layout.map((row, rowIndex) => (
@@ -222,6 +224,7 @@ export const HallConfiguration: React.FC<HallConfigurationProps> = ({
                 setSeatsPerRow(0);
                 setLayout([]);
               }}
+              disabled={isLoading}
             >
               Отмена
             </ConfigButton>
